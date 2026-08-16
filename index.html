@@ -381,23 +381,28 @@
     border:1px solid var(--ink); border-radius:7px; background:#fff; }
 
   /* ---------- free arrangement + layers ---------- */
-  .custom-asm{ display:flex; gap:8px; align-items:flex-start; margin-top:10px; }
-  .asm-stage.cstage{ width:200px; height:380px; margin:0; flex:0 0 200px; }
-  .layer-panel{ flex:1 1 auto; min-width:0; background:var(--paper); border:1px solid var(--ink);
-    border-radius:10px; padding:8px 7px; }
+  .custom-asm{ display:flex; gap:7px; align-items:flex-start; margin-top:10px; }
+  .asm-stage.cstage{ margin:0; flex:1 1 auto; min-width:0; height:380px; position:relative;
+    overflow:hidden; touch-action:none; }
+  .cstage-inner{ position:absolute; left:0; top:0; width:250px; height:380px; transform-origin:top left; }
+  .layer-panel{ flex:0 0 58px; width:58px; min-width:0; background:var(--paper); border:1px solid var(--ink);
+    border-radius:9px; padding:6px 4px; }
   .lp-head{ font-family:var(--tag); font-size:9.5px; text-transform:uppercase; color:#8a8069;
     text-align:center; margin-bottom:6px; letter-spacing:0.05em; }
   .lp-top, .lp-bot{ font-family:var(--tag); font-size:8.5px; color:#a89d80; text-align:center; padding:2px 0; }
   .lp-list{ position:relative; }
-  .lp-item{ position:absolute; left:0; right:0; height:32px; display:flex; align-items:center; gap:6px;
-    background:#fff; border:1px solid var(--ink); border-radius:7px; padding:0 7px; cursor:grab;
-    touch-action:none; transition:transform 0.12s ease; }
+  .lp-item{ position:absolute; left:0; right:0; height:32px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:1px;
+    background:#fff; border:1px solid var(--ink); border-radius:6px; padding:0 2px; cursor:grab;
+    touch-action:none; transition:transform 0.12s ease; overflow:hidden; }
   .lp-item.dragging{ cursor:grabbing; box-shadow:var(--shadow); z-index:20; transition:none; }
-  .lp-grip{ font-size:9px; color:#b6ab8e; letter-spacing:-2px; flex:0 0 auto; }
-  .lp-sw{ width:15px; height:15px; border-radius:4px; border:1px solid var(--ink); flex:0 0 15px; }
-  .lp-name{ font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .art-box.cart{ width:150px; height:230px; }
-  .art-in.cart-in{ width:200px; height:380px; transform:scale(0.6); }
+  .lp-sw{ width:16px; height:11px; border-radius:3px; border:1px solid var(--ink); flex:0 0 11px; }
+  .lp-name{ font-size:8px; line-height:1.05; max-width:100%; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; text-align:center; }
+  .lp-head{ font-size:8px; }
+  .apiece{ touch-action:none; }
+  .art-box.cart{ width:162px; height:247px; }
+  .art-in.cart-in{ width:250px; height:380px; transform:scale(0.65); }
 
   .toast{
     position:absolute; left:50%; bottom:118px; transform:translateX(-50%) translateY(14px);
@@ -1132,7 +1137,7 @@ function updateTraceUI(partId){
    No pattern to follow: the player names a piece, picks cloth, and cuts
    whatever shape they like. The cut becomes the piece. */
 
-var CSTAGE_W=200, CSTAGE_H=380;   /* free-arrangement space, in stage units */
+var CSTAGE_W=250, CSTAGE_H=380;   /* free-arrangement space, in stage units */
 var CUSTOM_SCALE=0.62;            /* cloth units -> stage pixels */
 var CLOTH_YARDS=2;                /* one square of cloth costs this much yardage */
 
@@ -1232,14 +1237,27 @@ function removeCustomItem(id){
 }
 
 function initCustomArrange(){
-  var pos={}, order=[];
+  var pos={}, order=[], tf={};
   state.customItems.forEach(function(it,i){
     var w=it.bw*CUSTOM_SCALE, h=it.bh*CUSTOM_SCALE;
     pos[it.id]={ x:clamp((CSTAGE_W-w)/2,0,CSTAGE_W-w), y:clamp(20+i*72,0,CSTAGE_H-h) };
+    tf[it.id]={ s:1, r:0 };     /* scale and rotation, set by the player */
     order.push(it.id);
   });
   /* order[0] is the topmost layer */
-  state.customArrange={ pos:pos, order:order, dragging:null, ox:0, oy:0 };
+  state.customArrange={ pos:pos, order:order, tf:tf, dragging:null, ox:0, oy:0 };
+}
+
+/* Scale/rotation for a piece, tolerating arrangements made before they existed. */
+function getTF(id){
+  var a=state.customArrange;
+  if (!a.tf) a.tf={};
+  if (!a.tf[id]) a.tf[id]={ s:1, r:0 };
+  return a.tf[id];
+}
+function tfStyle(id){
+  var t=getTF(id);
+  return 'transform:rotate('+t.r.toFixed(1)+'deg) scale('+t.s.toFixed(3)+'); transform-origin:50% 50%;';
 }
 
 function customItemById(id){
@@ -2131,7 +2149,8 @@ function bodyCustomAssembly(){
     var pos=arr.pos[it.id];
     var w=it.bw*CUSTOM_SCALE, h=it.bh*CUSTOM_SCALE;
     return '<div class="apiece" data-cust="'+it.id+'" '+
-      'style="left:'+pos.x+'px; top:'+pos.y+'px; width:'+w+'px; height:'+h+'px; z-index:'+customZ(it.id)+';">'+
+      'style="left:'+pos.x+'px; top:'+pos.y+'px; width:'+w+'px; height:'+h+'px; '+
+      'z-index:'+customZ(it.id)+'; '+tfStyle(it.id)+'">'+
       piecePolySVG(it.fabricId, it.cutShape, w, h, 2)+
     '</div>';
   }).join('');
@@ -2139,16 +2158,17 @@ function bodyCustomAssembly(){
   var layers=arr.order.map(function(id,i){
     var it=customItemById(id); if(!it) return '';
     var f=fabricById(it.fabricId);
-    return '<div class="lp-item" data-layer="'+id+'" style="top:'+(i*38)+'px;">'+
-      '<span class="lp-grip">&#8942;&#8942;</span>'+
+    return '<div class="lp-item" data-layer="'+id+'" style="top:'+(i*38)+'px;" title="'+esc(it.name)+'">'+
       '<span class="lp-sw" style="background:'+swatchBg(f)+'"></span>'+
       '<span class="lp-name">'+esc(it.name)+'</span>'+
     '</div>';
   }).join('');
 
-  return '<div class="hint" style="margin-top:0;">Drag the pieces to arrange the outfit. Drag the layer list to set what sits on top.</div>'+
+  return '<div class="hint" style="margin-top:0;">Drag to move a piece. Pinch to resize and twist to rotate &mdash; '+
+      'or on a mouse, scroll while holding a piece to resize and right-drag to rotate. '+
+      'Drag the layer strip to set what sits in front.</div>'+
     '<div class="custom-asm">'+
-      '<div class="asm-stage cstage" id="cust-stage">'+pieces+'</div>'+
+      '<div class="asm-stage cstage" id="cust-stage"><div class="cstage-inner" id="cust-inner">'+pieces+'</div></div>'+
       '<div class="layer-panel">'+
         '<div class="lp-head">Layers</div>'+
         '<div class="lp-top">front</div>'+
@@ -2183,34 +2203,164 @@ function bodyAssembly(){
     '<button class="btn primary" data-act="proceed-asm" '+(assemblyAllPlaced()?'':'disabled')+'>Continue to Pricing</button>';
 }
 
-/* Free arrangement: pieces go anywhere, no slots and no snapping. */
+/* Free arrangement: pieces go anywhere, no slots and no snapping.
+   Move: drag. Resize: pinch, or wheel while holding the piece.
+   Rotate: twist two fingers, or right-drag. */
+/* The stage stretches to whatever width is free; the fixed 250x380 coordinate
+   space is scaled to fill it, so positions stay exact at any size. */
+function fitCustomStage(stage){
+  var inner=stage.querySelector('.cstage-inner');
+  if (!inner) return;
+  var w=stage.clientWidth||CSTAGE_W;
+  var k=clamp(w/CSTAGE_W, 0.5, 1.4);
+  inner.style.transform='scale('+k+')';
+  stage.style.height=Math.round(CSTAGE_H*k)+'px';
+}
+
 function initCustomArrangeDrag(stage){
-  Array.prototype.forEach.call(stage.querySelectorAll('.apiece'), function(el){
+  var inner=stage.querySelector('.cstage-inner') || stage;
+  var pointers={};          /* live pointers, by id */
+  var mode=null;            /* 'move' | 'rotate' | 'gesture' */
+  var activeId=null;        /* the piece being manipulated */
+  var gesture=null;         /* pinch/twist reference values */
+  var rotate=null;          /* right-drag reference values */
+
+  function stageScale(){
+    var r=inner.getBoundingClientRect();
+    return { r:r, sx:CSTAGE_W/(r.width||CSTAGE_W), sy:CSTAGE_H/(r.height||CSTAGE_H) };
+  }
+  function toStage(e){
+    var g=stageScale();
+    return { x:(e.clientX-g.r.left)*g.sx, y:(e.clientY-g.r.top)*g.sy };
+  }
+  function elFor(id){ return inner.querySelector('.apiece[data-cust="'+id+'"]'); }
+  function sizeOf(id){
+    var it=customItemById(id);
+    return it ? { w:it.bw*CUSTOM_SCALE, h:it.bh*CUSTOM_SCALE } : { w:0, h:0 };
+  }
+  function centerOf(id){
+    var p=state.customArrange.pos[id], s=sizeOf(id);
+    return { x:p.x+s.w/2, y:p.y+s.h/2 };
+  }
+  function applyStyle(id){
+    var el=elFor(id); if(!el) return;
+    var p=state.customArrange.pos[id], t=getTF(id);
+    el.style.left=p.x+'px'; el.style.top=p.y+'px';
+    el.style.transform='rotate('+t.r.toFixed(1)+'deg) scale('+t.s.toFixed(3)+')';
+  }
+  function livePointers(){
+    var out=[]; for (var k in pointers) out.push(pointers[k]); return out;
+  }
+
+  Array.prototype.forEach.call(inner.querySelectorAll('.apiece'), function(el){
+    var id=el.getAttribute('data-cust');
+
     el.addEventListener('pointerdown', function(e){
       e.preventDefault();
       try{ el.setPointerCapture(e.pointerId); }catch(err){}
-      var r=stage.getBoundingClientRect(), sx=CSTAGE_W/r.width, sy=CSTAGE_H/r.height;
-      var id=el.getAttribute('data-cust'), pos=state.customArrange.pos[id];
+      var p=toStage(e);
+      pointers[e.pointerId]={ id:id, x:p.x, y:p.y, cx:e.clientX, cy:e.clientY };
+
+      /* right button starts a rotation drag */
+      if (e.button===2){
+        activeId=id; mode='rotate';
+        var c=centerOf(id);
+        rotate={ startAngle:Math.atan2(p.y-c.y, p.x-c.x)*180/Math.PI, startRot:getTF(id).r };
+        return;
+      }
+
+      var mine=livePointers().filter(function(q){ return q.id===id; });
+      if (mine.length>=2){
+        /* two fingers on the same piece: pinch to resize, twist to rotate */
+        activeId=id; mode='gesture';
+        var a=mine[0], b=mine[1], t=getTF(id);
+        gesture={
+          startDist:Math.max(1,Math.hypot(a.x-b.x, a.y-b.y)),
+          startAngle:Math.atan2(b.y-a.y, b.x-a.x)*180/Math.PI,
+          startScale:t.s, startRot:t.r
+        };
+        state.customArrange.dragging=null;
+        return;
+      }
+
+      activeId=id; mode='move';
       state.customArrange.dragging=id;
-      state.customArrange.ox=(e.clientX-r.left)*sx-pos.x;
-      state.customArrange.oy=(e.clientY-r.top)*sy-pos.y;
+      var pos=state.customArrange.pos[id];
+      state.customArrange.ox=p.x-pos.x;
+      state.customArrange.oy=p.y-pos.y;
     });
+
+    /* wheel while holding the piece resizes it */
+    el.addEventListener('wheel', function(e){
+      if (state.customArrange.dragging!==id) return;
+      e.preventDefault();
+      var t=getTF(id);
+      t.s=clamp(t.s * (e.deltaY<0 ? 1.08 : 1/1.08), 0.3, 3);
+      applyStyle(id);
+    }, { passive:false });
   });
+
   stage.addEventListener('pointermove', function(e){
-    var id=state.customArrange.dragging; if(!id) return;
+    if (!pointers[e.pointerId] && mode!=='rotate') return;
     e.preventDefault();
-    var r=stage.getBoundingClientRect(), sx=CSTAGE_W/r.width, sy=CSTAGE_H/r.height;
-    var it=customItemById(id); if(!it) return;
-    var w=it.bw*CUSTOM_SCALE, h=it.bh*CUSTOM_SCALE;
-    var x=clamp((e.clientX-r.left)*sx-state.customArrange.ox, -w*0.3, CSTAGE_W-w*0.7);
-    var y=clamp((e.clientY-r.top)*sy-state.customArrange.oy, -h*0.3, CSTAGE_H-h*0.7);
-    state.customArrange.pos[id]={x:x,y:y};
-    var el=stage.querySelector('.apiece[data-cust="'+id+'"]');
-    if (el){ el.style.left=x+'px'; el.style.top=y+'px'; }
+    var p=toStage(e);
+    if (pointers[e.pointerId]){
+      pointers[e.pointerId].x=p.x; pointers[e.pointerId].y=p.y;
+      pointers[e.pointerId].cx=e.clientX; pointers[e.pointerId].cy=e.clientY;
+    }
+
+    if (mode==='gesture' && activeId){
+      var mine=livePointers().filter(function(q){ return q.id===activeId; });
+      if (mine.length<2) return;
+      var a=mine[0], b=mine[1], t=getTF(activeId);
+      var dist=Math.max(1,Math.hypot(a.x-b.x, a.y-b.y));
+      var ang=Math.atan2(b.y-a.y, b.x-a.x)*180/Math.PI;
+      t.s=clamp(gesture.startScale*(dist/gesture.startDist), 0.3, 3);
+      t.r=gesture.startRot+(ang-gesture.startAngle);
+      applyStyle(activeId);
+      return;
+    }
+
+    if (mode==='rotate' && activeId){
+      var c=centerOf(activeId), tr=getTF(activeId);
+      var a2=Math.atan2(p.y-c.y, p.x-c.x)*180/Math.PI;
+      tr.r=rotate.startRot+(a2-rotate.startAngle);
+      applyStyle(activeId);
+      return;
+    }
+
+    var id=state.customArrange.dragging;
+    if (mode==='move' && id){
+      var sz=sizeOf(id);
+      var x=clamp(p.x-state.customArrange.ox, -sz.w*0.4, CSTAGE_W-sz.w*0.6);
+      var y=clamp(p.y-state.customArrange.oy, -sz.h*0.4, CSTAGE_H-sz.h*0.6);
+      state.customArrange.pos[id]={x:x,y:y};
+      applyStyle(id);
+    }
   });
-  function end(){ state.customArrange.dragging=null; }
-  stage.addEventListener('pointerup', end);
-  stage.addEventListener('pointercancel', end);
+
+  function release(e){
+    if (e && pointers[e.pointerId]) delete pointers[e.pointerId];
+    var remaining=livePointers();
+    if (mode==='gesture' && remaining.filter(function(q){ return q.id===activeId; }).length<2){
+      mode=remaining.length?'move':null;
+      if (mode==='move'){
+        /* keep dragging with the finger that is still down */
+        var q=remaining[0];
+        state.customArrange.dragging=q.id; activeId=q.id;
+        var pos=state.customArrange.pos[q.id];
+        state.customArrange.ox=q.x-pos.x; state.customArrange.oy=q.y-pos.y;
+      }
+    }
+    if (!remaining.length){
+      mode=null; activeId=null; gesture=null; rotate=null;
+      state.customArrange.dragging=null;
+    }
+  }
+  stage.addEventListener('pointerup', release);
+  stage.addEventListener('pointercancel', release);
+  /* right-drag is a rotate gesture, so suppress the browser menu here */
+  stage.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 }
 
 /* Layer list: drag a row up or down to change what sits in front. */
@@ -2269,7 +2419,8 @@ function customArt(cg){
   var html=state.customItems.map(function(it){
     var pos=arr.pos[it.id];
     var w=it.bw*CUSTOM_SCALE, h=it.bh*CUSTOM_SCALE;
-    return '<div class="art-p" style="left:'+pos.x+'px; top:'+pos.y+'px; width:'+w+'px; height:'+h+'px; z-index:'+customZ(it.id)+';">'+
+    return '<div class="art-p" style="left:'+pos.x+'px; top:'+pos.y+'px; width:'+w+'px; height:'+h+'px; '+
+      'z-index:'+customZ(it.id)+'; '+tfStyle(it.id)+'">'+
       piecePolySVG(it.fabricId, it.cutShape, w, h, 2)+'</div>';
   }).join('');
   return '<div class="art-box cart"><div class="art-in cart-in">'+html+'</div></div>';
@@ -2416,7 +2567,7 @@ function renderModal(){
   }
   if (m==='customasm'){
     var cs=document.getElementById('cust-stage');
-    if (cs) initCustomArrangeDrag(cs);
+    if (cs){ fitCustomStage(cs); initCustomArrangeDrag(cs); }
     var lp=document.getElementById('lp-list');
     if (lp) initLayerDrag(lp);
   }
@@ -2537,6 +2688,8 @@ document.addEventListener('input', function(e){
 /* keep the trace canvas and the scene stage correctly sized on rotation / resize */
 window.addEventListener('resize', function(){
   fitScene();
+  var cs=document.getElementById('cust-stage');
+  if (cs) fitCustomStage(cs);
   if (state.ui.modal==='trace') renderModal();
 });
 window.addEventListener('orientationchange', function(){
