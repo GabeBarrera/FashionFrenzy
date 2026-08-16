@@ -226,6 +226,28 @@
   .pref-chip .dot{ width:15px; height:15px; border-radius:50%; border:1px solid var(--ink); }
   .budget-big{ font-family:var(--display); font-weight:800; font-size:24px; color:var(--thread-green); }
 
+  .pref-chip.sm{ padding:2px 9px 2px 3px; font-size:11px; margin:0 4px 4px 0; }
+  .pref-chip.sm .dot{ width:13px; height:13px; }
+
+  /* requirements reminder shown while choosing fabric */
+  .req-strip{
+    background:#fff; border:1px solid var(--ink); border-radius:10px;
+    padding:10px 12px; margin-bottom:12px;
+  }
+  .req-strip .rs-name{
+    font-family:var(--tag); font-size:9.5px; text-transform:uppercase; color:#8a8069;
+    letter-spacing:0.05em; margin-bottom:7px;
+  }
+  .rs-line{ display:flex; align-items:flex-start; gap:9px; margin-bottom:4px; }
+  .rs-line:last-child{ margin-bottom:0; align-items:center; }
+  .rs-k{
+    flex:0 0 54px; font-family:var(--tag); font-size:9.5px; text-transform:uppercase;
+    color:#8a8069; padding-top:4px;
+  }
+  .rs-line:last-child .rs-k{ padding-top:0; }
+  .rs-v{ flex:1; min-width:0; }
+  .rs-budget{ font-family:var(--display); font-weight:800; font-size:16px; color:var(--thread-green); }
+
   /* cutting piece list */
   .piece-btn{
     width:100%; text-align:left; background:#fff; border:1px solid var(--ink); border-radius:9px;
@@ -244,22 +266,44 @@
   .quality-row .wrap i{ display:block; height:100%; }
   .quality-row .pct{ font-family:var(--display); font-weight:700; font-size:15px; min-width:42px; text-align:right; }
 
-  /* scene frame (trace view) */
-  .scene-frame{ position:relative; width:100%; border-radius:10px; overflow:hidden; border:1px solid var(--ink); }
-  .scene-frame img{ display:block; width:100%; height:auto; pointer-events:none; -webkit-user-drag:none; }
-  .scene-frame .over{
-    position:absolute; left:0; right:0; top:40%; bottom:0; padding:12px;
-    display:flex; flex-direction:column; align-items:center; gap:10px; overflow-y:auto;
+  /* trace view: fills the modal, never scrolls */
+  .modal.trace .modal-body{ padding:0; overflow:hidden; display:flex; }
+  .trace-wrap{
+    flex:1 1 auto; min-height:0; display:flex; flex-direction:column; align-items:center; gap:8px;
+    padding:10px 12px calc(var(--safe-bot) + 10px);
+    background-size:cover; background-position:center 14%; background-repeat:no-repeat;
   }
+  .trace-req{
+    flex:0 0 auto; max-width:100%; display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+    gap:4px 7px; background:rgba(251,247,238,0.93); border:1px solid var(--ink); border-radius:8px; padding:5px 10px;
+  }
+  .trace-req .tr-k{ font-family:var(--tag); font-size:9px; text-transform:uppercase; color:#8a8069; letter-spacing:0.04em; }
+  .trace-req .tr-b{ font-family:var(--display); font-weight:800; font-size:13px; color:var(--thread-green); }
   .chip-label{
     font-family:var(--tag); font-size:9.5px; text-transform:uppercase; color:#6b6252;
     background:rgba(251,247,238,0.9); border-radius:6px; padding:4px 10px;
   }
-  .fabric-grid{ display:flex; flex-wrap:wrap; gap:7px; justify-content:center; }
-  .fab-sw{ width:42px; height:42px; border-radius:8px; border:2px solid var(--ink); cursor:pointer; padding:0; }
+  .fabric-zone{ flex:0 0 auto; width:100%; display:flex; flex-direction:column; align-items:center; gap:7px; }
+  .fabric-grid{
+    display:flex; flex-wrap:wrap; gap:6px; justify-content:center;
+    background:rgba(251,247,238,0.82); border-radius:10px; padding:8px;
+    max-height:34vh; overflow-y:auto;
+  }
+  .fab-sw{ width:38px; height:38px; border-radius:8px; border:2px solid var(--ink); cursor:pointer; padding:0; }
   .fab-sw.sel{ outline:3px solid var(--thread-red); outline-offset:2px; }
   .fab-sw:disabled{ opacity:0.25; cursor:default; }
-  canvas.cutc{ border:1px solid var(--line); border-radius:8px; touch-action:none; cursor:crosshair; background:#fff; }
+  /* collapsed picker: one tappable chip showing the chosen fabric */
+  .fab-toggle{
+    display:flex; align-items:center; gap:8px; cursor:pointer;
+    background:rgba(251,247,238,0.93); border:1px solid var(--ink); border-radius:20px;
+    padding:5px 12px 5px 5px; font-family:var(--tag); font-size:10.5px; text-transform:uppercase;
+  }
+  .fab-toggle .sw{ width:26px; height:26px; border-radius:50%; border:1px solid var(--ink); flex:0 0 26px; }
+  .fab-toggle .caret{ font-size:9px; color:#8a8069; }
+  /* the piece sits directly on the table &mdash; no backdrop behind it */
+  .trace-stage{ flex:1 1 auto; min-height:0; width:100%; display:flex; align-items:center; justify-content:center; }
+  canvas.cutc{ touch-action:none; cursor:crosshair; background:transparent; border:none; display:block; }
+  .trace-foot{ flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:6px; }
   .prog{ width:240px; max-width:82%; height:7px; border-radius:5px; background:rgba(251,247,238,0.9); border:1px solid var(--line); overflow:hidden; }
   .prog i{ display:block; height:100%; background:var(--thread-red); }
   .done-card{ background:#e9f1ec; border:1px solid var(--ink); border-radius:10px; padding:20px 24px; text-align:center; }
@@ -456,7 +500,7 @@ function freshState(){
     cutGarment:null,
     price:0,
     lastResult:null,
-    ui:{ modal:null, tracePart:null, modalId:null }
+    ui:{ modal:null, tracePart:null, modalId:null, fabricOpen:true }
   };
 }
 
@@ -619,17 +663,38 @@ function currentOverallQuality(){
   return { pct: w?tot/w:0, complete:complete };
 }
 
-/* ============================= CUTTING ============================= */
+/* ============================= CUTTING =============================
+   The player cuts a real pattern piece out of a square of cloth:
+   guide lines are printed on the cloth, they drag the blade around them,
+   and whatever outline they actually cut becomes the piece used later. */
 
-var MARK_TOL = 15;
+var CLOTH = 200;          /* the cloth square is CLOTH x CLOTH units */
+var CUT_TOL = 16;         /* how near the guide a cut counts as following it */
+var CLOSE_COVERAGE = 88;  /* percent of the guide that must be cut through */
 
+/* Fit a pattern shape into the middle of the cloth square. */
+var TARGET_CACHE = {};
+function targetPolyFor(shapeKey){
+  if (TARGET_CACHE[shapeKey]) return TARGET_CACHE[shapeKey];
+  var pts=SHAPES[shapeKey].points;
+  var xs=pts.map(function(p){return p[0];}), ys=pts.map(function(p){return p[1];});
+  var minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs);
+  var minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
+  var w=maxX-minX, h=maxY-minY;
+  var s=Math.min((CLOTH-46)/w,(CLOTH-46)/h);
+  var ox=(CLOTH-w*s)/2-minX*s, oy=(CLOTH-h*s)/2-minY*s;
+  TARGET_CACHE[shapeKey]=pts.map(function(p){ return [p[0]*s+ox, p[1]*s+oy]; });
+  return TARGET_CACHE[shapeKey];
+}
+
+/* Even sample points around the guide, used for scoring the cut. */
 function polygonResample(points, spacing){
   var pts=points.concat([points[0]]), segLens=[], total=0;
   for (var i=0;i<pts.length-1;i++){
     var dx=pts[i+1][0]-pts[i][0], dy=pts[i+1][1]-pts[i][1];
     var l=Math.sqrt(dx*dx+dy*dy); segLens.push(l); total+=l;
   }
-  var n=Math.max(28, Math.round(total/spacing)), out=[], seg=0, acc=0;
+  var n=Math.max(40, Math.round(total/spacing)), out=[], seg=0, acc=0;
   for (var k=0;k<n;k++){
     var target=(k/n)*total;
     while (seg<segLens.length-1 && acc+segLens[seg]<target){ acc+=segLens[seg]; seg++; }
@@ -640,18 +705,21 @@ function polygonResample(points, spacing){
   return out;
 }
 
+/* Update guide coverage/accuracy for one point of the blade's travel. */
 function markNear(st,p){
   for (var i=0;i<st.resample.length;i++){
     var s=st.resample[i], dx=s.x-p.x, dy=s.y-p.y;
     var d=Math.sqrt(dx*dx+dy*dy);
     if (d<s.minDist) s.minDist=d;
-    if (!s.cut && d<=MARK_TOL) s.cut=true;
+    if (!s.cut && d<=CUT_TOL) s.cut=true;
   }
 }
 function markAlong(st,p0,p1){
-  for (var s=0;s<=6;s++){
-    var t=s/6;
-    markNear(st,{ x:p0.x+(p1.x-p0.x)*t, y:p0.y+(p1.y-p0.y)*t });
+  var dx=p1.x-p0.x, dy=p1.y-p0.y;
+  var steps=Math.max(2, Math.min(24, Math.ceil(Math.sqrt(dx*dx+dy*dy)/3)));
+  for (var s=0;s<=steps;s++){
+    var t=s/steps;
+    markNear(st,{ x:p0.x+dx*t, y:p0.y+dy*t });
   }
 }
 function piecePercentCut(st){
@@ -660,37 +728,82 @@ function piecePercentCut(st){
   return n/st.resample.length*100;
 }
 
+/* Record where the blade actually went. */
+function addCutPoint(st,p){
+  var last=st.cutPath.length?st.cutPath[st.cutPath.length-1]:null;
+  if (last){
+    var dx=p.x-last.x, dy=p.y-last.y;
+    if (dx*dx+dy*dy < 4) return;   /* skip jitter */
+  }
+  st.cutPath.push({x:clamp(p.x,0,CLOTH), y:clamp(p.y,0,CLOTH)});
+}
+
+/* Reduce the traced path to a tidy polygon for rendering later. */
+function simplifyPath(path, maxPts){
+  if (path.length<=maxPts) return path.slice();
+  var step=path.length/maxPts, out=[];
+  for (var i=0;i<maxPts;i++) out.push(path[Math.floor(i*step)]);
+  return out;
+}
+
+/* Turn the cut outline into a CSS clip-path plus its aspect ratio. */
+function pathToClip(path){
+  if (!path || path.length<3) return null;
+  var xs=path.map(function(p){return p.x;}), ys=path.map(function(p){return p.y;});
+  var minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs);
+  var minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
+  var w=Math.max(1,maxX-minX), h=Math.max(1,maxY-minY);
+  var poly=path.map(function(p){
+    return ((p.x-minX)/w*100).toFixed(1)+'% '+((p.y-minY)/h*100).toFixed(1)+'%';
+  }).join(', ');
+  return { clip:'polygon('+poly+')', aspect:w/h };
+}
+
 function selectFabricForPart(partId, fid){
   var g=state.guest, part=partOf(g.garment,partId);
   if (!fid){ state.cutting[partId]=null; renderModal(); return; }
   var avail = ownedYards(fid) - reservedYards(fid, partId);
   if (avail + 1e-9 < part.yards){ toast('Not enough unreserved yardage.'); return; }
+  var target=targetPolyFor(part.shape);
   state.cutting[partId] = {
     fabricId:fid,
-    resample:polygonResample(SHAPES[part.shape].points, 7),
-    dragging:false, prevPoint:null, lastPoint:null,
-    done:false, matchQuality:partMatchQuality(fid), finalQuality:null, precision:null
+    target:target,
+    resample:polygonResample(target, 5),
+    cutPath:[],
+    dragging:false, prevPoint:null,
+    done:false, matchQuality:partMatchQuality(fid), finalQuality:null, precision:null,
+    cutClip:null, cutAspect:null
   };
+  state.ui.fabricOpen=false;
   renderModal();
 }
 
 function resetPieceTrace(partId){
   var st=state.cutting[partId];
   if (!st || st.done) return;
-  var part=partOf(state.guest.garment,partId);
-  st.resample=polygonResample(SHAPES[part.shape].points,7);
-  st.prevPoint=null; st.lastPoint=null;
+  st.resample=polygonResample(st.target, 5);
+  st.cutPath=[]; st.prevPoint=null; st.dragging=false;
   renderModal();
 }
 
+/* Finish the piece once the blade has travelled the whole guide. */
 function finishPieceIfDone(partId, st){
-  if (st.done || piecePercentCut(st) < 92) return false;
+  if (st.done || piecePercentCut(st) < CLOSE_COVERAGE) return false;
+  var shaped=simplifyPath(st.cutPath, 56);
+  var clip=pathToClip(shaped);
+  if (!clip) return false;
+
   st.done=true;
+  st.cutShape=shaped;
+  st.cutClip=clip.clip;
+  st.cutAspect=clip.aspect;
+
   var sum=0,count=0;
   st.resample.forEach(function(s){ if (s.cut && isFinite(s.minDist)){ sum+=s.minDist; count++; } });
-  var avgDev = count ? sum/count : 10;
+  var avgDev = count ? sum/count : 12;
   st.precision = clamp(100 - avgDev*7, 30, 100);
   st.finalQuality = st.matchQuality * (0.85 + 0.15*(st.precision/100));
+
   var part = partOf(state.guest.garment, partId);
   state.stock[st.fabricId] -= part.yards;
   toast(part.label + ' cut &middot; ' + Math.round(st.precision) + '% precision');
@@ -701,64 +814,99 @@ function initCuttingCanvas(canvas, partId){
   if (!state.guest || !partId) return;
   var part=partOf(state.guest.garment,partId);
   if (!part) return;
-  var shape=SHAPES[part.shape];
+
+  /* the cloth is square, so fit the largest square in the space left over */
   var host=canvas.parentElement;
-  var availW=(host?host.clientWidth:320)-24;
-  var maxW=Math.min(availW, window.innerWidth*0.86, 380);
-  var maxH=Math.min(window.innerHeight*0.40, 380);
-  var scale=Math.min(maxW/shape.viewBox[0], maxH/shape.viewBox[1]);
-  var w=shape.viewBox[0]*scale, h=shape.viewBox[1]*scale;
+  var availW=(host && host.clientWidth ? host.clientWidth : window.innerWidth)-8;
+  var availH=(host && host.clientHeight ? host.clientHeight : window.innerHeight*0.4)-8;
+  var side=Math.max(120, Math.min(availW, availH));
   var dpr=window.devicePixelRatio||1;
-  canvas.width=w*dpr; canvas.height=h*dpr;
-  canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  canvas.width=side*dpr; canvas.height=side*dpr;
+  canvas.style.width=side+'px'; canvas.style.height=side+'px';
   var ctx=canvas.getContext('2d');
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  var scale=side/CLOTH;
 
   function toLocal(e){
     var r=canvas.getBoundingClientRect();
-    return { x:((e.clientX-r.left)*(w/r.width))/scale, y:((e.clientY-r.top)*(h/r.height))/scale };
+    return { x:((e.clientX-r.left)*(side/r.width))/scale, y:((e.clientY-r.top)*(side/r.height))/scale };
+  }
+
+  function tracePoly(pts, closeIt){
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x!==undefined?pts[0].x:pts[0][0], pts[0].y!==undefined?pts[0].y:pts[0][1]);
+    for (var i=1;i<pts.length;i++){
+      var p=pts[i];
+      ctx.lineTo(p.x!==undefined?p.x:p[0], p.y!==undefined?p.y:p[1]);
+    }
+    if (closeIt) ctx.closePath();
   }
 
   function draw(){
     var st=state.cutting[partId]; if(!st) return;
-    ctx.clearRect(0,0,w,h);
+    var fabric=fabricById(st.fabricId);
+    ctx.clearRect(0,0,side,side);
     ctx.save(); ctx.scale(scale,scale);
-    var pts=shape.points;
-    ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
-    for (var i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
-    ctx.closePath(); ctx.clip();
-    ctx.fillStyle=ctx.createPattern(fabricTile(fabricById(st.fabricId)),'repeat');
-    ctx.fillRect(0,0,shape.viewBox[0],shape.viewBox[1]);
-    if (st.done){ ctx.fillStyle='rgba(62,98,89,0.18)'; ctx.fillRect(0,0,shape.viewBox[0],shape.viewBox[1]); }
-    ctx.restore();
 
-    ctx.save(); ctx.scale(scale,scale);
-    ctx.strokeStyle='rgba(43,38,32,0.3)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(shape.gx,14); ctx.lineTo(shape.gx,shape.viewBox[1]-16); ctx.stroke();
+    if (st.done && st.cutShape){
+      /* the cloth is gone &mdash; only the piece they cut remains */
+      ctx.save();
+      tracePoly(st.cutShape,true); ctx.clip();
+      ctx.fillStyle=ctx.createPattern(fabricTile(fabric),'repeat');
+      ctx.fillRect(0,0,CLOTH,CLOTH);
+      ctx.restore();
+      ctx.lineWidth=2; ctx.strokeStyle='#2B2620';
+      tracePoly(st.cutShape,true); ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    /* the square of cloth */
+    ctx.fillStyle=ctx.createPattern(fabricTile(fabric),'repeat');
+    ctx.fillRect(0,0,CLOTH,CLOTH);
+    ctx.lineWidth=1.5; ctx.strokeStyle='rgba(43,38,32,0.55)';
+    ctx.strokeRect(0.75,0.75,CLOTH-1.5,CLOTH-1.5);
+
+    /* printed guide lines, brightening as the blade passes them */
     var sm=st.resample;
     for (var j=0;j<sm.length;j++){
       var a=sm[j], b=sm[(j+1)%sm.length];
       ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
-      if (a.cut && b.cut){ ctx.strokeStyle='#2B2620'; ctx.lineWidth=3; ctx.setLineDash([]); }
-      else { ctx.strokeStyle='#8a8069'; ctx.lineWidth=2; ctx.setLineDash([4,4]); }
+      if (a.cut && b.cut){ ctx.strokeStyle='rgba(251,247,238,0.95)'; ctx.lineWidth=2.5; ctx.setLineDash([]); }
+      else { ctx.strokeStyle='rgba(251,247,238,0.7)'; ctx.lineWidth=1.5; ctx.setLineDash([5,4]); }
       ctx.stroke();
     }
     ctx.setLineDash([]);
-    if (st.dragging && st.lastPoint){
-      ctx.beginPath(); ctx.arc(st.lastPoint.x,st.lastPoint.y,5.5,0,Math.PI*2);
-      ctx.fillStyle='rgba(178,58,72,0.9)'; ctx.fill();
+
+    /* the cut the player has actually made */
+    if (st.cutPath.length>1){
+      ctx.lineJoin='round'; ctx.lineCap='round';
+      ctx.strokeStyle='rgba(43,38,32,0.35)'; ctx.lineWidth=5;
+      tracePoly(st.cutPath,false); ctx.stroke();
+      ctx.strokeStyle='#B23A48'; ctx.lineWidth=2.5;
+      tracePoly(st.cutPath,false); ctx.stroke();
+    }
+    if (st.cutPath.length){
+      var last=st.cutPath[st.cutPath.length-1];
+      ctx.beginPath(); ctx.arc(last.x,last.y,4.5,0,Math.PI*2);
+      ctx.fillStyle='#B23A48'; ctx.fill();
+      var first=st.cutPath[0];
+      ctx.beginPath(); ctx.arc(first.x,first.y,4,0,Math.PI*2);
+      ctx.strokeStyle='#2B2620'; ctx.lineWidth=1.5; ctx.stroke();
     }
     ctx.restore();
   }
   draw();
+  canvas._redraw=draw;
 
   canvas.addEventListener('pointerdown', function(e){
     var st=state.cutting[partId]; if(!st||st.done) return;
     e.preventDefault();
     try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
     st.dragging=true;
-    var p=toLocal(e); markNear(st,p);
-    st.prevPoint=p; st.lastPoint=p;
+    var p=toLocal(e);
+    markNear(st,p); addCutPoint(st,p);
+    st.prevPoint=p;
     draw(); updateTraceUI(partId);
   });
   canvas.addEventListener('pointermove', function(e){
@@ -766,7 +914,8 @@ function initCuttingCanvas(canvas, partId){
     e.preventDefault();
     var p=toLocal(e);
     if (st.prevPoint) markAlong(st,st.prevPoint,p); else markNear(st,p);
-    st.prevPoint=p; st.lastPoint=p;
+    addCutPoint(st,p);
+    st.prevPoint=p;
     draw(); updateTraceUI(partId);
   });
   function end(){
@@ -786,7 +935,7 @@ function updateTraceUI(partId){
   var bar=document.querySelector('.prog i');
   var lbl=document.getElementById('trace-pct');
   if (bar) bar.style.width=pct+'%';
-  if (lbl) lbl.textContent=pct+'% traced';
+  if (lbl) lbl.textContent=pct+'% cut';
 }
 
 /* ============================= ASSEMBLY ============================= */
@@ -794,6 +943,15 @@ function updateTraceUI(partId){
 function layoutFor(gid,pid){
   if (ASSEMBLY_LAYOUTS[gid] && ASSEMBLY_LAYOUTS[gid][pid]) return ASSEMBLY_LAYOUTS[gid][pid];
   return SINGLE_LAYOUT;
+}
+
+/* Fit a cut piece inside its slot without distorting the shape the player cut:
+   a sloppy, lopsided cut stays lopsided on the mannequin. */
+function fitCutBox(layout, aspect){
+  if (!aspect || !isFinite(aspect) || aspect<=0) return { w:layout.w, h:layout.h, dx:0, dy:0 };
+  var w=layout.w, h=w/aspect;
+  if (h>layout.h){ h=layout.h; w=h*aspect; }
+  return { w:w, h:h, dx:(layout.w-w)/2, dy:(layout.h-h)/2 };
 }
 
 function initAssemblyState(){
@@ -829,11 +987,13 @@ function initAssemblyDrag(stage){
     e.preventDefault();
     var r=stage.getBoundingClientRect(), sx=290/r.width, sy=450/r.height;
     var l=layoutFor(state.guest.garment.id,pid);
+    var st=state.cutting[pid], box=fitCutBox(l, st?st.cutAspect:null);
     var x=clamp((e.clientX-r.left)*sx-state.assembly.ox,0,290-l.w);
     var y=clamp((e.clientY-r.top)*sy-state.assembly.oy,0,450-l.h);
     state.assembly.positions[pid]={x:x,y:y};
     var el=stage.querySelector('.apiece[data-part="'+pid+'"]');
-    if (el){ el.style.left=x+'px'; el.style.top=y+'px'; }
+    /* the element is centred inside its slot, so keep that offset while dragging */
+    if (el){ el.style.left=(x+box.dx)+'px'; el.style.top=(y+box.dy)+'px'; }
   });
   function end(){
     var pid=state.assembly.dragging; if(!pid) return;
@@ -878,7 +1038,9 @@ function buildCutGarment(){
   var g=state.guest;
   var parts=g.garment.parts.map(function(p){
     var st=state.cutting[p.id];
-    return { id:p.id, label:p.label, fabricId:st.fabricId, yards:p.yards, weight:p.weight, quality:st.finalQuality, precision:st.precision };
+    return { id:p.id, label:p.label, fabricId:st.fabricId, yards:p.yards, weight:p.weight,
+             quality:st.finalQuality, precision:st.precision,
+             cutClip:st.cutClip, cutAspect:st.cutAspect };
   });
   var w=0,tot=0,cost=0,prec=0;
   parts.forEach(function(p){
@@ -1245,9 +1407,9 @@ function renderTray(){
 
 /* ============================= RENDER: MODALS ============================= */
 
-function modalShell(title, sub, bodyHtml, full){
+function modalShell(title, sub, bodyHtml, full, cls){
   return '<div class="modal-veil" data-veil="1">'+
-    '<div class="modal'+(full?' full':'')+'">'+
+    '<div class="modal'+(full?' full':'')+(cls?' '+cls:'')+'">'+
       '<div class="modal-head">'+
         '<div><h3>'+title+'</h3>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'+
         '<button class="x-btn" data-act="close-modal">&times;</button>'+
@@ -1323,13 +1485,31 @@ function bodyTicketDetail(){
     '<button class="btn bad" data-act="decline" data-id="'+t.id+'">Turn Away</button>';
 }
 
+/* Compact reminder of what the guest asked for, shown wherever fabric gets chosen. */
+function requirementStrip(){
+  var g=state.guest;
+  if (!g) return '';
+  var chips=g.wantColors.map(function(cid){
+    if (cid==='any') return '<span class="pref-chip sm">Any color</span>';
+    var c=COLORS.filter(function(x){ return x.id===cid; })[0];
+    return '<span class="pref-chip sm"><span class="dot" style="background:'+c.hex+'"></span>'+c.name+'</span>';
+  }).join('');
+  var pat = g.wantPattern==='any' ? 'Any pattern' : PATTERNS.filter(function(p){ return p.id===g.wantPattern; })[0].name;
+  return '<div class="req-strip">'+
+    '<div class="rs-name">'+esc(g.name)+' wants</div>'+
+    '<div class="rs-line"><span class="rs-k">Colors</span><span class="rs-v">'+chips+'</span></div>'+
+    '<div class="rs-line"><span class="rs-k">Pattern</span><span class="rs-v"><span class="pref-chip sm">'+pat+'</span></span></div>'+
+    '<div class="rs-line"><span class="rs-k">Budget</span><span class="rs-v rs-budget">'+money(g.budget)+'</span></div>'+
+  '</div>';
+}
+
 function bodyCutting(){
   var g=state.guest, q=currentOverallQuality();
   var col=q.pct>=75?'var(--good)':(q.pct>=45?'var(--brass)':'var(--bad)');
   var btns=g.garment.parts.map(function(p){
     var st=state.cutting[p.id], cls, lbl, sw='';
     if (st && st.done){ cls='done'; lbl='&check; Cut &middot; '+Math.round(st.precision)+'% precision'; }
-    else if (st && st.fabricId){ cls='progress'; lbl=Math.round(piecePercentCut(st))+'% traced'; }
+    else if (st && st.fabricId){ cls='progress'; lbl=Math.round(piecePercentCut(st))+'% cut'; }
     else { cls='pending'; lbl='Not started'; }
     if (st && st.fabricId) sw='<span class="pb-sw" style="background:'+swatchBg(fabricById(st.fabricId))+'"></span>';
     return '<button class="piece-btn" data-act="open-piece" data-part="'+p.id+'">'+
@@ -1340,7 +1520,8 @@ function bodyCutting(){
   }).join('');
   var all=g.garment.parts.every(function(p){ return state.cutting[p.id] && state.cutting[p.id].done; });
   var next=g.garment.parts.length>1?'Go to Assembly':'Price This Piece';
-  return '<div class="hint" style="margin-top:0;">Tap a piece to pick its fabric and cut it out on the table.</div>'+
+  return requirementStrip()+
+    '<div class="hint" style="margin-top:0;">Tap a piece to pick its fabric and cut it out on the table.</div>'+
     btns+
     '<div class="quality-row"><span class="lbl">Overall Match</span>'+
       '<div class="wrap"><i style="width:'+q.pct+'%; background:'+col+';"></i></div>'+
@@ -1352,40 +1533,76 @@ function bodyCutting(){
 function bodyTrace(){
   var pid=state.ui.tracePart;
   var part=partOf(state.guest.garment,pid), st=state.cutting[pid];
+  var g=state.guest;
+  var hasFabric = st && st.fabricId;
+  var open = state.ui.fabricOpen || !hasFabric;
 
-  var grid=FABRICS.map(function(f){
-    var avail=ownedYards(f.id)-reservedYards(f.id,pid);
-    var can=avail+1e-9>=part.yards;
-    var sel=st&&st.fabricId===f.id;
-    var lock=st&&st.done;
-    return '<button class="fab-sw'+(sel?' sel':'')+'" style="background:'+swatchBg(f)+'" '+
-      'data-act="pick-fabric" data-part="'+pid+'" data-id="'+f.id+'" '+
-      ((can&&!lock)?'':'disabled')+' title="'+f.colorName+' '+f.patternName+' &middot; '+avail.toFixed(1)+'yd"></button>';
+  /* compact reminder of the guest's request */
+  var wantChips=g.wantColors.map(function(cid){
+    if (cid==='any') return '<span class="pref-chip sm">Any color</span>';
+    var c=COLORS.filter(function(x){ return x.id===cid; })[0];
+    return '<span class="pref-chip sm"><span class="dot" style="background:'+c.hex+'"></span>'+c.name+'</span>';
   }).join('');
+  var patName = g.wantPattern==='any' ? 'Any pattern' : PATTERNS.filter(function(p){ return p.id===g.wantPattern; })[0].name;
+  var req='<div class="trace-req">'+
+      '<span class="tr-k">Wants</span>'+wantChips+
+      '<span class="pref-chip sm">'+patName+'</span>'+
+      '<span class="tr-k">Up to</span><span class="tr-b">'+money(g.budget)+'</span>'+
+    '</div>';
 
-  var inner;
-  if (!st || !st.fabricId){
-    inner='<div class="chip-label">Pick a fabric to start cutting</div>';
-  } else if (st.done){
-    inner='<div class="done-card"><div class="h">Piece Cut</div>'+
-      '<div class="p">Precision '+Math.round(st.precision)+'%</div>'+
-      '<button class="btn primary" data-act="close-piece">Back to Pieces</button></div>';
-  } else {
-    var pct=Math.round(piecePercentCut(st));
-    inner='<canvas class="cutc" id="trace-canvas" data-part="'+pid+'"></canvas>'+
-      '<div class="chip-label">drag along the dashed line to cut</div>'+
-      '<div class="prog"><i style="width:'+pct+'%"></i></div>'+
-      '<div class="chip-label" id="trace-pct">'+pct+'% traced</div>'+
-      '<button class="btn inline" data-act="reset-trace" data-part="'+pid+'">Reset Trace</button>';
-  }
-
-  return '<div class="scene-frame">'+
-      '<img src="'+SCENE_IMG+'" alt="Cutting table" draggable="false">'+
-      '<div class="over">'+
+  /* fabric picker: full grid, or collapsed to a single chip once chosen */
+  var fabricZone;
+  if (st && st.done){
+    fabricZone='';
+  } else if (open){
+    var grid=FABRICS.map(function(f){
+      var avail=ownedYards(f.id)-reservedYards(f.id,pid);
+      var can=avail+1e-9>=part.yards;
+      var sel=hasFabric && st.fabricId===f.id;
+      return '<button class="fab-sw'+(sel?' sel':'')+'" style="background:'+swatchBg(f)+'" '+
+        'data-act="pick-fabric" data-part="'+pid+'" data-id="'+f.id+'" '+(can?'':'disabled')+
+        ' title="'+f.colorName+' '+f.patternName+' &middot; '+avail.toFixed(1)+'yd"></button>';
+    }).join('');
+    fabricZone='<div class="fabric-zone">'+
         '<div class="chip-label">Choose Fabric</div>'+
         '<div class="fabric-grid">'+grid+'</div>'+
-        inner+
-      '</div>'+
+      '</div>';
+  } else {
+    var f=fabricById(st.fabricId);
+    fabricZone='<div class="fabric-zone">'+
+        '<button class="fab-toggle" data-act="toggle-fabric">'+
+          '<span class="sw" style="background:'+swatchBg(f)+'"></span>'+
+          f.colorName+' '+f.patternName+
+          '<span class="caret">&#9660; change</span>'+
+        '</button>'+
+      '</div>';
+  }
+
+  /* stage + footer */
+  var stage, foot;
+  if (!hasFabric){
+    stage='<div class="trace-stage"><div class="chip-label">Pick a fabric to lay out the cloth</div></div>';
+    foot='';
+  } else if (st.done){
+    stage='<div class="trace-stage"><div class="done-card">'+
+        '<div class="h">Piece Cut</div>'+
+        '<div class="p">Precision '+Math.round(st.precision)+'%</div>'+
+        '<button class="btn primary" data-act="close-piece">Back to Pieces</button>'+
+      '</div></div>';
+    foot='';
+  } else {
+    var pct=Math.round(piecePercentCut(st));
+    stage='<div class="trace-stage"><canvas class="cutc" id="trace-canvas" data-part="'+pid+'"></canvas></div>';
+    foot='<div class="trace-foot">'+
+        '<div class="chip-label">cut around the guide lines</div>'+
+        '<div class="prog"><i style="width:'+pct+'%"></i></div>'+
+        '<div class="chip-label" id="trace-pct">'+pct+'% cut</div>'+
+        '<button class="btn inline" data-act="reset-trace" data-part="'+pid+'">Start Over</button>'+
+      '</div>';
+  }
+
+  return '<div class="trace-wrap" style="background-image:url('+SCENE_IMG+');">'+
+      req + fabricZone + stage + foot +
     '</div>';
 }
 
@@ -1398,9 +1615,12 @@ function bodyAssembly(){
   var pieces=g.garment.parts.map(function(p){
     var l=layoutFor(g.garment.id,p.id), st=state.cutting[p.id];
     var placed=state.assembly.placed[p.id], pos=state.assembly.positions[p.id];
+    /* render the outline the player actually cut, not the ideal pattern */
+    var box=fitCutBox(l, st.cutAspect);
+    var clip=st.cutClip || shapeClip(p.shape);
     return '<div class="apiece'+(placed?' locked':'')+'" data-part="'+p.id+'" '+
-      'style="left:'+pos.x+'px; top:'+pos.y+'px; width:'+l.w+'px; height:'+l.h+'px; '+
-      'clip-path:'+shapeClip(p.shape)+'; background:'+swatchBg(fabricById(st.fabricId))+'; z-index:'+(placed?l.z:10)+';">'+
+      'style="left:'+(pos.x+box.dx)+'px; top:'+(pos.y+box.dy)+'px; width:'+box.w+'px; height:'+box.h+'px; '+
+      'clip-path:'+clip+'; background:'+swatchBg(fabricById(st.fabricId))+'; z-index:'+(placed?l.z:10)+';">'+
       '<span class="tg">'+p.label+'</span></div>';
   }).join('');
   return '<div class="hint" style="margin-top:0;">Drag each cut piece into its dashed outline.</div>'+
@@ -1412,8 +1632,12 @@ function garmentArt(cg){
   var g=garmentTypeById(cg.garmentId);
   var html=cg.parts.map(function(p){
     var l=layoutFor(g.id,p.id), def=partOf(g,p.id);
-    return '<div class="art-p" style="left:'+l.x+'px; top:'+l.y+'px; width:'+l.w+'px; height:'+l.h+'px; '+
-      'clip-path:'+shapeClip(def.shape)+'; background:'+swatchBg(fabricById(p.fabricId))+'; z-index:'+l.z+';"></div>';
+    /* the finished garment is made of the shapes the player actually cut */
+    var box=fitCutBox(l, p.cutAspect);
+    var clip=p.cutClip || shapeClip(def.shape);
+    return '<div class="art-p" style="left:'+(l.x+box.dx)+'px; top:'+(l.y+box.dy)+'px; '+
+      'width:'+box.w+'px; height:'+box.h+'px; '+
+      'clip-path:'+clip+'; background:'+swatchBg(fabricById(p.fabricId))+'; z-index:'+l.z+';"></div>';
   }).join('');
   return '<div class="art-box"><div class="art-in">'+html+'</div></div>';
 }
@@ -1474,7 +1698,8 @@ function bodyMenu(){
     '<div class="note" style="margin-top:14px;">'+
       '<b>How to play</b><br>'+
       'Open the shop, then take order tickets as guests arrive. Tap a ticket to see the colors, pattern, and budget they want. '+
-      'Pick fabric for each pattern piece and trace along its dashed cut line to cut it out &mdash; the closer you follow the line, the better your precision. '+
+      'Pick fabric for each pattern piece, then cut it out of the square of cloth by dragging around the printed guide lines. '+
+      'The closer you follow them the better your precision &mdash; and the outline you actually cut is the shape that goes into the garment. '+
       'Assemble multi-piece garments, set a price, and present it. '+
       'Tap the thread spools to order fabric and the lower cubby to work the clearance rack.'+
     '</div>';
@@ -1492,7 +1717,7 @@ function renderModal(){
   else if (m==='ticket') html=modalShell('Order Details','', bodyTicketDetail());
   else if (m==='cutting') html=modalShell('Cutting Table', state.guest?esc(state.guest.garment.name):'', bodyCutting());
   else if (m==='trace') html=modalShell(partOf(state.guest.garment,state.ui.tracePart).label,
-                                        'needs '+partOf(state.guest.garment,state.ui.tracePart).yards+' yd', bodyTrace(), true);
+                                        'needs '+partOf(state.guest.garment,state.ui.tracePart).yards+' yd', bodyTrace(), true, 'trace');
   else if (m==='assembly') html=modalShell('Assembly Table', state.guest?esc(state.guest.garment.name):'', bodyAssembly(), true);
   else if (m==='pricing') html=modalShell('Set Your Price','', bodyPricing(), true);
   else if (m==='result') html=modalShell('Result','', bodyResult(), true);
@@ -1557,7 +1782,12 @@ document.addEventListener('click', function(e){
     case 'decline': declineTicket(id); break;
     case 'resume': state.ui.modal='cutting'; renderModal(); break;
 
-    case 'open-piece': state.ui.tracePart=part; state.ui.modal='trace'; renderModal(); break;
+    case 'open-piece':
+      state.ui.tracePart=part;
+      state.ui.fabricOpen=!(state.cutting[part] && state.cutting[part].fabricId);
+      state.ui.modal='trace';
+      renderModal(); break;
+    case 'toggle-fabric': state.ui.fabricOpen=!state.ui.fabricOpen; renderModal(); break;
     case 'close-piece': state.ui.modal='cutting'; state.ui.tracePart=null; renderModal(); break;
     case 'pick-fabric': selectFabricForPart(part,id); break;
     case 'reset-trace': resetPieceTrace(part); break;
