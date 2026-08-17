@@ -82,6 +82,13 @@
   .stat .v{ font-family:var(--display); font-weight:700; font-size:14px; margin-top:1px; white-space:nowrap; }
   .stat.cash .v{ color:var(--thread-green); }
   .stat.rep .v{ color:var(--brass); font-size:12px; letter-spacing:-1px; }
+  .stat.clockstat .v{ font-size:12px; letter-spacing:-0.2px; }
+  @media (max-width:360px){
+    .hud-stats{ gap:4px; }
+    .stat{ padding:5px 2px; }
+    .stat .v{ font-size:12px; }
+    .stat.clockstat .v{ font-size:11px; }
+  }
 
   /* ---------------- Scene ---------------- */
   #scene{
@@ -218,6 +225,28 @@
     border-radius:6px; padding:9px 10px; cursor:pointer; white-space:nowrap;
   }
   .buy:disabled{ background:#bdb49c; cursor:default; }
+
+  /* colour-first fabric picker */
+  .shop-group{ margin-bottom:8px; }
+  .shop-color{
+    width:100%; display:grid; grid-template-columns:34px 1fr 24px; gap:10px; align-items:center;
+    border:1px solid var(--ink); border-radius:9px; padding:9px 11px; background:var(--paper);
+    cursor:pointer; text-align:left;
+  }
+  .shop-color.open{ border-radius:9px 9px 0 0; background:#fff; }
+  .shop-color .sw{ width:34px; height:34px; border-radius:6px; }
+  .shop-color .nm{ font-family:var(--display); font-weight:700; font-size:15px; line-height:1.15; }
+  .shop-color .nm small{ display:block; font-family:var(--tag); font-weight:400; font-size:10px; color:#8a8069; margin-top:1px; }
+  .shop-color .chev{
+    font-family:var(--display); font-weight:800; font-size:20px; line-height:1;
+    width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+    border:1px solid var(--line); border-radius:6px; color:var(--thread-green);
+  }
+  .shop-drop{
+    border:1px solid var(--ink); border-top:none; border-radius:0 0 9px 9px;
+    background:var(--canvas); padding:8px 8px 2px;
+  }
+  .shop-drop .shop-row{ margin-bottom:6px; }
 
   /* clearance */
   .rack-item{ border:1px solid var(--line); border-radius:9px; background:#fff; padding:10px 11px; margin-bottom:8px; }
@@ -395,8 +424,16 @@
   .ex-card::before{ content:""; position:absolute; left:50%; top:-7px; transform:translateX(-50%);
     width:12px; height:12px; border-radius:50%; background:var(--thread-red); border:1px solid var(--ink); }
   .ex-art{ width:100%; height:150px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
-  .ex-art .art-box{ margin:0 auto; transform:scale(0.82); }
-  .ex-name{ font-family:var(--display); font-weight:700; font-size:13px; margin-top:4px; line-height:1.15; }
+  .ex-art .art-box{ margin:0 auto; transform:none; }
+  .ex-name-row{ display:flex; align-items:flex-start; justify-content:center; gap:6px; margin-top:4px; }
+  .ex-name{ font-family:var(--display); font-weight:700; font-size:13px; line-height:1.15; }
+  .ex-name-row .ex-name{ margin-top:0; }
+  .ex-edit{
+    flex:0 0 auto; width:22px; height:22px; border:1px solid var(--ink); border-radius:5px;
+    background:var(--canvas); cursor:pointer; padding:0; color:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ex-edit:active{ background:var(--paper); }
   .ex-val{ font-family:var(--tag); font-size:11px; color:var(--thread-green); margin-top:2px; }
   .ex-x{ position:absolute; top:5px; right:6px; width:22px; height:22px; border-radius:50%;
     border:1px solid var(--ink); background:#fff; cursor:pointer; font-size:15px; line-height:1; padding:0; z-index:2; }
@@ -504,37 +541,35 @@ function saveSettings(){
 
 /* ============================= STATIC DATA ============================= */
 
+/* The eight base colours the shop stocks. Every colour is offered in all
+   three patterns, so guests only ever ask for combinations we can make. */
 var COLORS = [
-  {id:'crimson',  name:'Crimson',       hex:'#B23A48'},
-  {id:'gold',     name:'Brass Gold',    hex:'#C9A227'},
-  {id:'emerald',  name:'Emerald',       hex:'#3E6259'},
-  {id:'navy',     name:'Midnight Navy', hex:'#2C3E66'},
-  {id:'blush',    name:'Blush Pink',    hex:'#E3AFB4'},
   {id:'ivory',    name:'Ivory',         hex:'#F1E9D8'},
   {id:'charcoal', name:'Charcoal',      hex:'#3A3532'},
-  {id:'lilac',    name:'Lilac',         hex:'#9B8AA6'},
-  {id:'mustard',  name:'Mustard',       hex:'#D8A63D'},
-  {id:'teal',     name:'Teal',          hex:'#2E7D74'}
+  {id:'navy',     name:'Midnight Navy', hex:'#2C3E66'},
+  {id:'crimson',  name:'Crimson',       hex:'#B23A48'},
+  {id:'blush',    name:'Blush Pink',    hex:'#E3AFB4'},
+  {id:'emerald',  name:'Emerald',       hex:'#3E6259'},
+  {id:'gold',     name:'Golden Yellow', hex:'#E4B53B'},
+  {id:'purple',   name:'Royal Purple',  hex:'#6B4A9E'}
 ];
 
 var PATTERNS = [
   {id:'solid', name:'Solid', priceAdd:0},
   {id:'stripes', name:'Stripes', priceAdd:2},
-  {id:'dots', name:'Polka Dot', priceAdd:3},
-  {id:'plaid', name:'Plaid', priceAdd:4}
+  {id:'dots', name:'Polka Dot', priceAdd:3}
 ];
 
-var FABRIC_RECIPES = [
-  ['ivory','solid'],['charcoal','solid'],['navy','solid'],['crimson','solid'],
-  ['blush','solid'],['emerald','solid'],['mustard','solid'],['teal','solid'],
-  ['crimson','stripes'],['navy','stripes'],['ivory','stripes'],['gold','stripes'],
-  ['blush','dots'],['charcoal','dots'],['teal','dots'],['lilac','dots'],
-  ['navy','plaid'],['mustard','plaid'],['emerald','plaid'],['crimson','plaid']
-];
+/* Build every colour x pattern combination, colour-major so the shop menu
+   can group the three pattern bolts under each colour. */
+var FABRIC_RECIPES = [];
+COLORS.forEach(function(c){
+  PATTERNS.forEach(function(p){ FABRIC_RECIPES.push([c.id, p.id]); });
+});
 
 function colorRarity(id){
-  var rare = {gold:2, teal:1.6, emerald:1.3, lilac:1.4, mustard:1.2, navy:1};
-  return rare[id] || 0.6;
+  var rare = {purple:1.6, gold:1.4, emerald:1.3, navy:1, crimson:0.9, blush:0.9};
+  return rare[id] || 0.7;
 }
 
 var FABRICS = FABRIC_RECIPES.map(function(r,i){
@@ -631,7 +666,7 @@ function freshState(){
     price:0,
     lastResult:null,
     ui:{ modal:null, tracePart:null, modalId:null, fabricOpen:true,
-         catalogTab:'std', donateMode:false, donateSel:[] }
+         catalogTab:'std', donateMode:false, donateSel:[], shopColor:null }
   };
 }
 
@@ -1425,11 +1460,14 @@ function endCatalogDesign(){
 function addExclusive(){
   var cg=state.cutGarment; if (!cg) return;
   var g=state.guest;
-  var baseName = (g && g.exclusiveName) ? g.exclusiveName
+  var suggested = (g && g.exclusiveName) ? g.exclusiveName
                : (cg.custom ? 'Signature Piece' : cg.garmentName);
+  var name = window.prompt('Name this exclusive as it will appear in your catalog:', suggested);
+  if (name===null) return;                       /* player cancelled */
+  name = name.trim() || (suggested + ' No.' + (state.exclusives.length+1));
   var ex={
     id:'ex'+(exclusiveSeq++),
-    name: baseName + ' No.' + (state.exclusives.length+1),
+    name: name,
     cutGarment: clone(cg),
     customItems: clone(state.customItems||[]),
     customArrange: state.customArrange ? clone(state.customArrange) : null,
@@ -1453,12 +1491,22 @@ function removeExclusive(id){
   renderModal();
 }
 
+function renameExclusive(id){
+  var ex=exclusiveById(id); if (!ex) return;
+  var name=window.prompt('Rename this exclusive:', ex.name);
+  if (name===null) return;                /* cancelled */
+  name=name.trim(); if (!name) return;
+  ex.name=name;
+  toast('Renamed to '+esc(name)+'.');
+  renderModal();
+}
+
 /* Render a saved exclusive by briefly lending its pieces to the shared art code. */
 function exclusiveArt(ex){
   var savedItems=state.customItems, savedArr=state.customArrange;
   state.customItems=ex.customItems||[];
   state.customArrange=ex.customArrange||null;
-  var html=garmentArt(ex.cutGarment);
+  var html=garmentArt(ex.cutGarment, ART_TARGET_CAT);
   state.customItems=savedItems; state.customArrange=savedArr;
   return html;
 }
@@ -1989,17 +2037,13 @@ function renderHUD(){
       '<div class="stat cash"><div class="k">Cash</div><div class="v">'+money(state.cash)+'</div></div>'+
       '<div class="stat rep"><div class="k">Reputation</div><div class="v">'+stars+'</div></div>'+
       '<div class="stat"><div class="k">Sales</div><div class="v">'+money(state.totalSales)+'</div></div>'+
-      '<div class="stat"><div class="k">Guests</div><div class="v">'+state.guestsServed+'</div></div>'+
+      '<div class="stat clockstat"><div class="k">Day '+state.day+'</div><div class="v" id="hud-time">'+fmtClock(state.clock)+'</div></div>'+
     '</div>';
 }
 
 /* ============================= RENDER: SCENE ============================= */
 
 function renderScene(){
-  var pct = clamp((state.clock-OPEN_MIN)/DAY_SPAN*100, 0, 100);
-  var statusTxt = state.phase==='open' ? 'Open' : 'Closed';
-  var statusCls = state.phase==='open' ? 'open' : 'closed';
-
   var rackBadge = state.rack.length ? '<span class="hs-badge">'+state.rack.length+'</span>' : '';
 
   var veil='';
@@ -2030,12 +2074,6 @@ function renderScene(){
         '<span class="hs-label">Catalog'+ (state.exclusives.length?'<span class="hs-badge">'+state.exclusives.length+'</span>':'') +'</span>'+
       '</button>'+
     '</div>'+
-    '<div class="clock-badge">'+
-      '<div class="day">Day '+state.day+'</div>'+
-      '<div class="time">'+fmtClock(state.clock)+'</div>'+
-      '<div class="status '+statusCls+'">'+statusTxt+'</div>'+
-      '<div class="clock-bar"><i style="width:'+pct+'%"></i></div>'+
-    '</div>'+
     veil;
 
   fitScene();
@@ -2056,10 +2094,8 @@ function fitScene(){
 }
 
 function updateClockUI(){
-  var t=document.querySelector('.clock-badge .time');
-  var b=document.querySelector('.clock-bar i');
+  var t=document.getElementById('hud-time');
   if (t) t.textContent=fmtClock(state.clock);
-  if (b) b.style.width=clamp((state.clock-OPEN_MIN)/DAY_SPAN*100,0,100)+'%';
 }
 
 /* ============================= RENDER: TRAY ============================= */
@@ -2112,16 +2148,33 @@ function modalShell(title, sub, bodyHtml, full, cls){
 }
 
 function bodyShop(){
-  var rows=FABRICS.map(function(f){
-    var afford=state.cash>=f.pricePerYard*2;
-    return '<div class="shop-row">'+
-      '<div class="sw" style="background:'+swatchBg(f)+'"></div>'+
-      '<div class="nm">'+f.colorName+' &middot; '+f.patternName+
-        '<small>'+money(f.pricePerYard)+' / yd &middot; in stock '+ownedYards(f.id).toFixed(1)+' yd</small></div>'+
-      '<button class="buy" data-act="buy" data-id="'+f.id+'" '+(afford?'':'disabled')+'>+2 yd<br>'+money(f.pricePerYard*2)+'</button>'+
-    '</div>';
+  var openId=state.ui.shopColor;
+  var groups=COLORS.map(function(c){
+    var isOpen=openId===c.id;
+    var owned=0;
+    FABRICS.forEach(function(f){ if (f.colorId===c.id) owned+=ownedYards(f.id); });
+    var head='<button class="shop-color'+(isOpen?' open':'')+'" data-act="shop-color" data-id="'+c.id+'" aria-expanded="'+(isOpen?'true':'false')+'">'+
+        '<span class="sw" style="background:'+c.hex+'"></span>'+
+        '<span class="nm">'+c.name+
+          '<small>'+(owned>0?'in stock '+owned.toFixed(1)+' yd':'tap to order')+'</small></span>'+
+        '<span class="chev">'+(isOpen?'&minus;':'+')+'</span>'+
+      '</button>';
+    var drop='';
+    if (isOpen){
+      var rows=FABRICS.filter(function(f){ return f.colorId===c.id; }).map(function(f){
+        var afford=state.cash>=f.pricePerYard*2;
+        return '<div class="shop-row">'+
+          '<div class="sw" style="background:'+swatchBg(f)+'"></div>'+
+          '<div class="nm">'+f.patternName+
+            '<small>'+money(f.pricePerYard)+' / yd &middot; in stock '+ownedYards(f.id).toFixed(1)+' yd</small></div>'+
+          '<button class="buy" data-act="buy" data-id="'+f.id+'" '+(afford?'':'disabled')+'>+2 yd<br>'+money(f.pricePerYard*2)+'</button>'+
+        '</div>';
+      }).join('');
+      drop='<div class="shop-drop">'+rows+'</div>';
+    }
+    return '<div class="shop-group'+(isOpen?' open':'')+'">'+head+drop+'</div>';
   }).join('');
-  return '<div class="hint" style="margin-top:0;">Fabric is bought by the yard. Each pattern piece consumes its yardage when you finish cutting it.</div>'+rows;
+  return '<div class="hint" style="margin-top:0;">Pick a colour to reveal its Solid, Stripes, and Polka Dot bolts. Fabric is bought by the yard.</div>'+groups;
 }
 
 function rackChips(r){
@@ -2202,7 +2255,12 @@ function catalogExclusives(){
     return '<div class="ex-card">'+
       '<button class="ex-x" data-act="remove-exclusive" data-id="'+ex.id+'" title="Remove">&times;</button>'+
       '<div class="ex-art">'+exclusiveArt(ex)+'</div>'+
-      '<div class="ex-name">'+esc(ex.name)+'</div>'+
+      '<div class="ex-name-row">'+
+        '<span class="ex-name">'+esc(ex.name)+'</span>'+
+        '<button class="ex-edit" data-act="rename-exclusive" data-id="'+ex.id+'" title="Edit name" aria-label="Edit name">'+
+          '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>'+
+        '</button>'+
+      '</div>'+
       '<div class="ex-val">'+money(ex.value)+'</div>'+
     '</div>';
   }).join('');
@@ -2746,33 +2804,68 @@ function initLayerDrag(list){
   });
 }
 
+/* How large the finished piece is drawn in each context. The art auto-scales
+   to fill and centre within these boxes, so a single small piece and a full
+   multi-piece outfit both read at a comfortable size. */
+var ART_TARGET_PRICE = { w:212, h:300, pad:20 };   /* Set Your Price / Result */
+var ART_TARGET_CAT   = { w:150, h:150, pad:12 };   /* catalog exclusive thumbnail */
+
+/* Scale + translate the piece layer so the pieces' bounding box fills the
+   target box (preserving aspect) and sits dead-centre. */
+function fitArtTransform(rects, target){
+  if (!rects.length) return '';
+  var minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  for (var i=0;i<rects.length;i++){
+    var r=rects[i];
+    if (r.x<minX) minX=r.x;
+    if (r.y<minY) minY=r.y;
+    if (r.x+r.w>maxX) maxX=r.x+r.w;
+    if (r.y+r.h>maxY) maxY=r.y+r.h;
+  }
+  var bw=Math.max(1,maxX-minX), bh=Math.max(1,maxY-minY);
+  var pad=target.pad||0;
+  var s=Math.min((target.w-pad)/bw, (target.h-pad)/bh);
+  var tx=(target.w-bw*s)/2 - minX*s;
+  var ty=(target.h-bh*s)/2 - minY*s;
+  return 'transform:translate('+tx.toFixed(2)+'px,'+ty.toFixed(2)+'px) scale('+s.toFixed(4)+'); transform-origin:0 0;';
+}
+function artBoxHTML(rects, pieceHtml, extraClass, target){
+  return '<div class="art-box'+(extraClass?' '+extraClass:'')+'" style="width:'+target.w+'px; height:'+target.h+'px;">'+
+    '<div class="art-in" style="'+fitArtTransform(rects, target)+'">'+pieceHtml+'</div></div>';
+}
+
 /* Custom outfits are drawn from the player's own arrangement. */
-function customArt(cg){
+function customArt(cg, target){
+  target=target||ART_TARGET_PRICE;
   if (!state.customArrange) initCustomArrange();
-  var arr=state.customArrange;
+  var arr=state.customArrange, rects=[];
   var html=state.customItems.map(function(it){
     var pos=arr.pos[it.id];
     var w=it.bw*CUSTOM_SCALE, h=it.bh*CUSTOM_SCALE;
+    rects.push({x:pos.x, y:pos.y, w:w, h:h});
     return '<div class="art-p" style="left:'+pos.x+'px; top:'+pos.y+'px; width:'+w+'px; height:'+h+'px; '+
       'z-index:'+customZ(it.id)+'; '+tfStyle(it.id)+'">'+
       piecePolySVG(it.fabricId, it.cutShape, w, h, 2)+'</div>';
   }).join('');
-  return '<div class="art-box cart"><div class="art-in cart-in">'+html+'</div></div>';
+  return artBoxHTML(rects, html, 'cart', target);
 }
 
-function garmentArt(cg){
-  if (cg.custom) return customArt(cg);
-  var g=garmentTypeById(cg.garmentId);
+function garmentArt(cg, target){
+  target=target||ART_TARGET_PRICE;
+  if (cg.custom) return customArt(cg, target);
+  var g=garmentTypeById(cg.garmentId), rects=[];
   var html=cg.parts.map(function(p){
     var l=layoutFor(g.id,p.id), def=partOf(g,p.id);
     /* the finished garment is made of the shapes the player actually cut */
     var box=fitCutBox(l, p.cutAspect);
+    var x=l.x+box.dx, y=l.y+box.dy;
+    rects.push({x:x, y:y, w:box.w, h:box.h});
     var pts=p.cutShape && p.cutShape.length>2 ? p.cutShape : shapePoints(def.shape);
-    return '<div class="art-p" style="left:'+(l.x+box.dx)+'px; top:'+(l.y+box.dy)+'px; '+
+    return '<div class="art-p" style="left:'+x+'px; top:'+y+'px; '+
       'width:'+box.w+'px; height:'+box.h+'px; z-index:'+l.z+';">'+
       piecePolySVG(p.fabricId, pts, box.w, box.h, 2)+'</div>';
   }).join('');
-  return '<div class="art-box"><div class="art-in">'+html+'</div></div>';
+  return artBoxHTML(rects, html, '', target);
 }
 
 function bodyPricing(){
@@ -3012,6 +3105,7 @@ document.addEventListener('click', function(e){
       renderModal(); break;
 
     case 'shop': state.ui.modal='shop'; renderModal(); break;
+    case 'shop-color': state.ui.shopColor=(state.ui.shopColor===id?null:id); renderModal(); break;
     case 'clearance': state.ui.modal='clearance'; state.ui.donateMode=false; state.ui.donateSel=[]; renderModal(); break;
     case 'buy': buyFabric(id,2); state.ui.modal='shop'; renderModal(); break;
     case 'sell-item': sellRackItem(id); state.ui.modal='clearance'; renderModal(); break;
@@ -3027,6 +3121,7 @@ document.addEventListener('click', function(e){
     case 'toggle-offering': toggleOffering(id); break;
     case 'design-exclusive': startCatalogDesign(); break;
     case 'remove-exclusive': removeExclusive(id); break;
+    case 'rename-exclusive': renameExclusive(id); break;
     case 'add-exclusive': addExclusive(); break;
 
     case 'open-store': openStore(); break;
@@ -3121,5 +3216,6 @@ renderAll();
 </script>
 </body>
 </html>
+
 
 
