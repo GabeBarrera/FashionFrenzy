@@ -365,6 +365,36 @@
     background:#fff; border:1px solid var(--ink); transition:left 0.16s ease; }
   .switch.on{ background:var(--thread-green); }
   .switch.on i{ left:26px; }
+
+  /* ---------- catalog ---------- */
+  .modal.catalog{ background:#e7dcc4; }
+  .cat-tabs{ display:flex; gap:8px; margin-bottom:12px; }
+  .cat-tab{ flex:1; font-family:var(--tag); font-size:12px; text-transform:uppercase; letter-spacing:0.03em;
+    border:1px solid var(--ink); border-radius:8px; padding:10px 6px; background:var(--paper); cursor:pointer; }
+  .cat-tab.on{ background:var(--ink); color:#fff; }
+  .cat-body{ padding-bottom:6px; }
+  .cat-std-row{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+    background:#fff; border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin-bottom:8px; }
+  .cat-std-row .csr-txt b{ font-family:var(--display); font-weight:700; font-size:15px; }
+  .cat-std-row .csr-txt small{ display:block; font-family:var(--tag); font-size:10px; color:#8a8069; margin-top:2px; }
+  .ex-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .ex-card{ position:relative; background:var(--paper); border:1px solid var(--ink); border-radius:10px;
+    padding:8px 8px 10px; box-shadow:var(--shadow); text-align:center; }
+  .ex-card::before{ content:""; position:absolute; left:50%; top:-7px; transform:translateX(-50%);
+    width:12px; height:12px; border-radius:50%; background:var(--thread-red); border:1px solid var(--ink); }
+  .ex-art{ width:100%; height:150px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .ex-art .art-box{ margin:0 auto; transform:scale(0.82); }
+  .ex-name{ font-family:var(--display); font-weight:700; font-size:13px; margin-top:4px; line-height:1.15; }
+  .ex-val{ font-family:var(--tag); font-size:11px; color:var(--thread-green); margin-top:2px; }
+  .ex-x{ position:absolute; top:5px; right:6px; width:22px; height:22px; border-radius:50%;
+    border:1px solid var(--ink); background:#fff; cursor:pointer; font-size:15px; line-height:1; padding:0; z-index:2; }
+
+  /* ---------- donations ---------- */
+  .don-count{ font-family:var(--tag); font-size:12px; color:var(--ink); text-align:center; margin:2px 0 10px; }
+  .rack-item.don{ cursor:pointer; }
+  .rack-item.don.sel{ border-color:var(--thread-green); box-shadow:0 0 0 2px rgba(62,98,89,0.28) inset; background:#f3f8f4; }
+  .don-check{ font-family:var(--display); font-weight:800; color:var(--thread-green); font-size:16px; min-width:16px; }
+
   .slider-row{ display:flex; align-items:center; gap:9px; margin-top:11px; }
   .slider-row input[type=range]{ flex:1; min-width:0; }
   .slider-cap{ font-family:var(--tag); font-size:9px; color:#8a8069; white-space:nowrap; }
@@ -506,19 +536,26 @@ var FABRICS = FABRIC_RECIPES.map(function(r,i){
 
 var SHAPES = {
   topShape:{ viewBox:[140,190], gx:70, points:[[40,15],[60,5],[80,5],[100,15],[125,38],[108,58],[100,45],[100,178],[40,178],[40,45],[32,58],[15,38]] },
-  bottomShape:{ viewBox:[140,190], gx:70, points:[[48,10],[92,10],[108,178],[74,178],[70,95],[66,178],[32,178]] },
+  bottomShape:{ viewBox:[140,190], gx:70, points:[[48,10],[92,10],[108,178],[82,178],[80,150],[72,146],[68,146],[60,150],[58,178],[32,178]] },
   bodiceShape:{ viewBox:[140,110], gx:70, points:[[48,12],[92,12],[84,95],[56,95]] },
   skirtShape:{ viewBox:[140,190], gx:70, points:[[40,10],[100,10],[135,178],[5,178]] },
   ballSkirtShape:{ viewBox:[170,190], gx:85, points:[[52,10],[118,10],[152,140],[140,168],[128,146],[114,172],[100,148],[84,174],[68,148],[54,172],[40,146],[28,168],[16,140]] },
-  sleeveShape:{ viewBox:[140,120], gx:70, points:[[70,8],[54,10],[40,20],[30,36],[26,54],[30,70],[40,86],[55,96],[70,100],[85,96],[100,86],[110,70],[114,54],[110,36],[100,20],[86,10]] }
+  sleeveShape:{ viewBox:[140,120], gx:70, points:[[70,8],[54,10],[40,20],[30,36],[26,54],[30,70],[40,86],[55,96],[70,100],[85,96],[100,86],[110,70],[114,54],[110,36],[100,20],[86,10]] },
+  coatShape:{ viewBox:[150,220], gx:75, points:[[38,20],[58,7],[70,22],[82,7],[102,20],[124,42],[110,60],[100,49],[100,205],[70,205],[70,66],[40,205],[40,49],[30,60],[16,42]] },
+  braShape:{ viewBox:[150,90], gx:75, points:[[12,34],[36,17],[60,30],[75,22],[90,30],[114,17],[138,34],[126,50],[104,44],[75,42],[46,44],[24,50]] },
+  briefShape:{ viewBox:[150,90], gx:75, points:[[16,18],[134,18],[124,44],[92,50],[75,72],[58,50],[26,44]] }
 };
 
 var GARMENT_TYPES = [
-  {id:'top', name:'Just a Top', parts:[{id:'torso', label:'Bodice Panel', yards:2, shape:'topShape', weight:1}]},
-  {id:'bottom', name:'Just a Bottom', parts:[{id:'legs', label:'Leg Panel', yards:2, shape:'bottomShape', weight:1}]},
+  {id:'top', name:'T-Shirt', parts:[{id:'torso', label:'Bodice Panel', yards:2, shape:'topShape', weight:1}]},
+  {id:'bottom', name:'Pants', parts:[{id:'legs', label:'Leg Panel', yards:2, shape:'bottomShape', weight:1}]},
   {id:'outfit', name:'Casual Outfit', parts:[
     {id:'torso', label:'Top', yards:1.5, shape:'topShape', weight:1},
     {id:'legs', label:'Bottom', yards:1.5, shape:'bottomShape', weight:1}]},
+  {id:'coat', name:'Coat', parts:[{id:'body', label:'Coat Panel', yards:3, shape:'coatShape', weight:1.3}]},
+  {id:'lingerie', name:'Lingerie', parts:[
+    {id:'bra', label:'Bralette', yards:0.5, shape:'braShape', weight:0.9},
+    {id:'briefs', label:'Briefs', yards:0.5, shape:'briefShape', weight:0.9}]},
   {id:'dress', name:'Summer Dress', parts:[
     {id:'bodice', label:'Bodice', yards:1, shape:'bodiceShape', weight:0.8},
     {id:'skirt', label:'Skirt', yards:2, shape:'skirtShape', weight:1.2}]},
@@ -530,6 +567,7 @@ var GARMENT_TYPES = [
 
 var ASSEMBLY_LAYOUTS = {
   outfit:{ torso:{x:85,y:10,w:118,h:148,z:2}, legs:{x:70,y:166,w:148,h:196,z:1} },
+  lingerie:{ bra:{x:78,y:70,w:134,h:80,z:2}, briefs:{x:86,y:210,w:118,h:70,z:1} },
   dress:{ bodice:{x:96,y:8,w:98,h:110,z:2}, skirt:{x:56,y:110,w:176,h:240,z:1} },
   ballgown:{ sleeves:{x:66,y:12,w:158,h:80,z:1}, bodice:{x:101,y:20,w:88,h:96,z:3}, skirt:{x:38,y:110,w:214,h:248,z:2} }
 };
@@ -554,7 +592,7 @@ function minPerMs(){ return DAY_SPAN / (clamp(settings.dayMinutes,1,60)*60000); 
 
 /* ============================= STATE ============================= */
 
-var state, ticketSeq, rackSeq, clockTimer, lastTickMs;
+var state, ticketSeq, rackSeq, exclusiveSeq, clockTimer, lastTickMs;
 
 function freshState(){
   return {
@@ -562,6 +600,8 @@ function freshState(){
     guestsServed:0, totalSales:0,
     stock:{ f0:3, f1:3 },
     rack:[],
+    exclusives:[],           /* player-designed signature pieces */
+    catalogOff:{},           /* garment ids the shop has switched off */
     phase:'closed',           /* closed | open | summary */
     clock:OPEN_MIN,
     tickets:[],
@@ -577,19 +617,22 @@ function freshState(){
     cutGarment:null,
     price:0,
     lastResult:null,
-    ui:{ modal:null, tracePart:null, modalId:null, fabricOpen:true }
+    ui:{ modal:null, tracePart:null, modalId:null, fabricOpen:true,
+         catalogTab:'std', donateMode:false, donateSel:[] }
   };
 }
 
 state = freshState();
 ticketSeq = 1;
 rackSeq = 1;
+exclusiveSeq = 1;
 
 /* ============================= HELPERS ============================= */
 
 function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
 function rnd(a,b){ return a + Math.random()*(b-a); }
 function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
 function money(n){ return '$' + Number(n).toFixed(2); }
 function fabricById(id){ for(var i=0;i<FABRICS.length;i++){ if(FABRICS[i].id===id) return FABRICS[i]; } return null; }
 function garmentTypeById(id){ for(var i=0;i<GARMENT_TYPES.length;i++){ if(GARMENT_TYPES[i].id===id) return GARMENT_TYPES[i]; } return null; }
@@ -671,7 +714,8 @@ function shapeClip(key){
 /* ============================= ORDER GENERATION ============================= */
 
 function generateGuest(){
-  var garment = pick(GARMENT_TYPES);
+  var pool = enabledGarments(); if (!pool.length) pool = GARMENT_TYPES;
+  var garment = pick(pool);
   var wantColors;
   if (Math.random() < 0.14){ wantColors=['any']; }
   else {
@@ -728,9 +772,39 @@ function generateCustomGuest(){
 
 function isCustom(){ return !!(state.guest && state.guest.custom); }
 
+function enabledGarments(){
+  return GARMENT_TYPES.filter(function(g){ return !state.catalogOff[g.id]; });
+}
+
 function spawnTicket(){
   if (activeOrderCount() >= MAX_ORDERS) return;
+  /* guests sometimes come in asking for one of your signature exclusives */
+  if (state.exclusives.length && Math.random()<0.22){ state.tickets.push(generateExclusiveGuest()); return; }
+  /* if every standard offering is switched off, only custom orders come in */
+  if (!enabledGarments().length){ state.tickets.push(generateCustomGuest()); return; }
   state.tickets.push(Math.random()<0.28 ? generateCustomGuest() : generateGuest());
+}
+
+function exclusiveById(id){
+  for (var i=0;i<state.exclusives.length;i++) if (state.exclusives[i].id===id) return state.exclusives[i];
+  return null;
+}
+
+/* A guest who wants a specific signature piece from the Exclusive catalog. */
+function generateExclusiveGuest(){
+  var ex=pick(state.exclusives);
+  var repF=1+(state.reputation-50)/220;
+  var base=ex.value||ex.cost||40;
+  return {
+    id:'t'+(ticketSeq++),
+    name:pick(GUEST_NAMES),
+    exclusiveId:ex.id, exclusiveName:ex.name,
+    garment:{ id:'exclusive', name:'Exclusive: '+ex.name },
+    wantColors:['any'], wantPattern:'any',
+    budget:Math.round(base*rnd(1.1,1.6)*repF),
+    arrivedAt:state.clock,
+    patience:Math.round(rnd(130,210))
+  };
 }
 
 /* ============================= SCORING ============================= */
@@ -1310,6 +1384,100 @@ function proceedCustomAssembly(){
   renderModal();
 }
 
+/* ============================= CATALOG & EXCLUSIVES ============================= */
+
+function toggleOffering(id){
+  state.catalogOff[id]=!state.catalogOff[id];
+  renderModal();
+}
+
+/* Start a design session that isn't tied to any guest: a synthetic "guest"
+   lets the whole custom-design flow run, and the result is filed as an exclusive. */
+function startCatalogDesign(){
+  state.guest={ name:'House Exclusive', custom:true, catalogDesign:true,
+    wantColors:['any'], wantPattern:'any', budget:99999,
+    garment:{ id:'custom', name:'Exclusive Design', parts:[] } };
+  state.customItems=[]; state.customDraft=null; state.customArrange=null;
+  state.cutGarment=null; state.cutting={}; state.assembly=null;
+  state.ui.modal='custom';
+  renderModal();
+}
+
+function endCatalogDesign(){
+  state.guest=null; state.customItems=[]; state.customDraft=null; state.customArrange=null;
+  state.cutGarment=null; state.cutting={}; state.assembly=null;
+}
+
+/* Save the piece currently on the pricing table into the Exclusive catalog. */
+function addExclusive(){
+  var cg=state.cutGarment; if (!cg) return;
+  var g=state.guest;
+  var baseName = (g && g.exclusiveName) ? g.exclusiveName
+               : (cg.custom ? 'Signature Piece' : cg.garmentName);
+  var ex={
+    id:'ex'+(exclusiveSeq++),
+    name: baseName + ' No.' + (state.exclusives.length+1),
+    cutGarment: clone(cg),
+    customItems: clone(state.customItems||[]),
+    customArrange: state.customArrange ? clone(state.customArrange) : null,
+    cost: cg.cost, quality: cg.quality,
+    value: Math.round(baseValue(cg)*(1.2+cg.quality/100))
+  };
+  state.exclusives.push(ex);
+  toast('Added to the Exclusive catalog.');
+  if (g && g.catalogDesign){
+    endCatalogDesign();
+    state.ui.modal='catalog'; state.ui.catalogTab='ex';
+    renderAll();
+  } else {
+    renderModal();   /* keep the pricing table open so the sale can still happen */
+  }
+}
+
+function removeExclusive(id){
+  state.exclusives=state.exclusives.filter(function(e){ return e.id!==id; });
+  toast('Removed from the catalog.');
+  renderModal();
+}
+
+/* Render a saved exclusive by briefly lending its pieces to the shared art code. */
+function exclusiveArt(ex){
+  var savedItems=state.customItems, savedArr=state.customArrange;
+  state.customItems=ex.customItems||[];
+  state.customArrange=ex.customArrange||null;
+  var html=garmentArt(ex.cutGarment);
+  state.customItems=savedItems; state.customArrange=savedArr;
+  return html;
+}
+
+/* ---- Donations from the clearance rack ---- */
+var DONATE_REP = 4;   /* one fifth of a star (a star spans 20 reputation) */
+
+function toggleDonate(id){
+  var sel=state.ui.donateSel||[];
+  var at=sel.indexOf(id);
+  if (at!==-1){ sel.splice(at,1); }
+  else if (sel.length<5){ sel.push(id); }
+  else { toast('You can donate up to 5 pieces at a time.'); return; }
+  state.ui.donateSel=sel;
+  renderModal();
+}
+
+function confirmDonate(){
+  var sel=state.ui.donateSel||[];
+  if (!sel.length) return;
+  var n=0;
+  state.rack=state.rack.filter(function(r){
+    if (sel.indexOf(r.id)!==-1){ n++; return false; }
+    return true;
+  });
+  state.reputation=clamp(state.reputation + n*DONATE_REP, 0, 100);
+  state.ui.donateMode=false; state.ui.donateSel=[];
+  var stars=(n*DONATE_REP/20).toFixed(1);
+  toast('Donated '+n+' piece'+(n===1?'':'s')+' &middot; reputation up '+stars+' star'+(stars==='1.0'?'':'s')+'.');
+  renderAll();
+}
+
 /* ---------- SVG piece rendering ----------
    Pieces are drawn as real polygons filled with the fabric and stroked black,
    so only the cut-out itself shows and its edges read cleanly. */
@@ -1444,8 +1612,26 @@ function acceptTicket(tid){
   var idx=-1;
   for (var i=0;i<state.tickets.length;i++) if (state.tickets[i].id===tid) idx=i;
   if (idx===-1) return;
-  state.guest=state.tickets[idx];
+  var t=state.tickets[idx];
   state.tickets.splice(idx,1);
+
+  /* Exclusive order: the piece is already designed, so jump straight to pricing. */
+  if (t.exclusiveId){
+    var ex=exclusiveById(t.exclusiveId);
+    if (!ex){ toast('That design is no longer in the catalog.'); renderAll(); return; }
+    state.guest=t;
+    state.guest.garment={ id:'exclusive', name:ex.name };
+    state.customItems=clone(ex.customItems||[]);
+    state.customArrange=ex.customArrange?clone(ex.customArrange):null;
+    state.cutGarment=clone(ex.cutGarment);
+    state.cutting={}; state.assembly=null; state.customDraft=null; state.lastResult=null;
+    state.price=Math.round(clamp(fairPrice(),1,t.budget*1.4));
+    state.ui.modal='pricing'; state.ui.tracePart=null;
+    renderAll();
+    return;
+  }
+
+  state.guest=t;
   state.cutting={}; state.assembly=null; state.cutGarment=null; state.price=0; state.lastResult=null;
   state.customItems=[]; state.customDraft=null; state.customArrange=null;
   state.ui.modal=state.guest.custom ? 'custom' : 'cutting';
@@ -1705,9 +1891,10 @@ function nextDay(){
 
 function saveGame(){
   var data={
-    v:1, day:state.day, cash:state.cash, reputation:state.reputation,
+    v:2, day:state.day, cash:state.cash, reputation:state.reputation,
     guestsServed:state.guestsServed, totalSales:state.totalSales,
-    stock:state.stock, rack:state.rack, rackSeq:rackSeq
+    stock:state.stock, rack:state.rack, rackSeq:rackSeq,
+    exclusives:state.exclusives, catalogOff:state.catalogOff, exclusiveSeq:exclusiveSeq
   };
   try{
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1741,6 +1928,9 @@ function loadGame(){
   state.stock=d.stock||{};
   state.rack=Array.isArray(d.rack)?d.rack:[];
   rackSeq=d.rackSeq||(state.rack.length+1);
+  state.exclusives=Array.isArray(d.exclusives)?d.exclusives:[];
+  state.catalogOff=d.catalogOff||{};
+  exclusiveSeq=d.exclusiveSeq||(state.exclusives.length+1);
   state.phase='closed';
   state.ui.modal=null;
   toast('Game loaded &mdash; Day ' + state.day + '.');
@@ -1750,7 +1940,7 @@ function loadGame(){
 function newGame(){
   stopClock();
   state=freshState();
-  ticketSeq=1; rackSeq=1;
+  ticketSeq=1; rackSeq=1; exclusiveSeq=1;
   toast('New game started.');
   renderAll();
 }
@@ -1805,6 +1995,10 @@ function renderScene(){
       /* wooden cubby carcass with the folded clothes -> clearance rack */
       '<button class="hotspot" data-act="clearance" style="left:18.5%; top:24.8%; width:57%; height:17.7%;">'+
         '<span class="hs-label">Clearance Rack'+ rackBadge +'</span>'+
+      '</button>'+
+      /* pinned dress design cards on the right wall -> catalog */
+      '<button class="hotspot" data-act="catalog" style="left:72%; top:7.5%; width:25%; height:14.5%;">'+
+        '<span class="hs-label">Catalog'+ (state.exclusives.length?'<span class="hs-badge">'+state.exclusives.length+'</span>':'') +'</span>'+
       '</button>'+
     '</div>'+
     '<div class="clock-badge">'+
@@ -1901,19 +2095,23 @@ function bodyShop(){
   return '<div class="hint" style="margin-top:0;">Fabric is bought by the yard. Each pattern piece consumes its yardage when you finish cutting it.</div>'+rows;
 }
 
+function rackChips(r){
+  return r.parts.map(function(p){
+    var f=fabricById(p.fabricId);
+    return '<span class="ri-chip"><span class="dot" style="background:'+swatchBg(f)+'"></span>'+
+      f.colorName+' '+f.patternName+' &middot; '+(Math.round(p.yards*0.5*2)/2).toFixed(1)+'yd back</span>';
+  }).join('');
+}
+
 function bodyClearance(){
   if (!state.rack.length){
     return '<div class="empty">The rack is empty. Garments a guest turns down end up here.</div>';
   }
+  if (state.ui.donateMode) return donateBody();
   var items=state.rack.map(function(r){
-    var chips=r.parts.map(function(p){
-      var f=fabricById(p.fabricId);
-      return '<span class="ri-chip"><span class="dot" style="background:'+swatchBg(f)+'"></span>'+
-        f.colorName+' '+f.patternName+' &middot; '+(Math.round(p.yards*0.5*2)/2).toFixed(1)+'yd back</span>';
-    }).join('');
     return '<div class="rack-item">'+
       '<div class="ri-top"><span class="ri-name">'+r.garmentName+'</span><span class="ri-q">'+Math.round(r.quality)+'% match</span></div>'+
-      '<div class="ri-fab">'+chips+'</div>'+
+      '<div class="ri-fab">'+rackChips(r)+'</div>'+
       '<div class="btn-row">'+
         '<button class="btn good" data-act="sell-item" data-id="'+r.id+'">Sell '+money(r.value)+'</button>'+
         '<button class="btn" data-act="recycle-item" data-id="'+r.id+'">Recycle Fabric</button>'+
@@ -1923,13 +2121,83 @@ function bodyClearance(){
   var total=state.rack.reduce(function(s,r){ return s+r.value; },0);
   return '<div class="hint" style="margin-top:0;">Sell a piece for cash, or recycle it to recover half its yardage back into your stock.</div>'+
     items+
-    '<button class="btn primary" data-act="sell-all">Sell Everything &middot; '+money(total)+'</button>';
+    '<button class="btn primary" data-act="sell-all">Sell Everything &middot; '+money(total)+'</button>'+
+    '<button class="btn" data-act="donate-start">Donate to Charity</button>';
+}
+
+function donateBody(){
+  var sel=state.ui.donateSel||[];
+  var items=state.rack.map(function(r){
+    var on=sel.indexOf(r.id)!==-1;
+    return '<div class="rack-item don'+(on?' sel':'')+'" data-act="donate-toggle" data-id="'+r.id+'">'+
+      '<div class="ri-top"><span class="ri-name">'+r.garmentName+'</span>'+
+        '<span class="don-check">'+(on?'&check;':'')+'</span></div>'+
+      '<div class="ri-fab">'+rackChips(r)+'</div>'+
+    '</div>';
+  }).join('');
+  var stars=(sel.length*DONATE_REP/20).toFixed(1);
+  return '<div class="hint" style="margin-top:0;">Pick up to 5 pieces to donate. Each one lifts your reputation by a fifth of a star.</div>'+
+    '<div class="don-count">'+sel.length+' / 5 selected &middot; +'+stars+' star'+(stars==='1.0'?'':'s')+'</div>'+
+    items+
+    '<button class="btn primary" data-act="donate-confirm" '+(sel.length?'':'disabled')+'>Donate '+sel.length+' Piece'+(sel.length===1?'':'s')+'</button>'+
+    '<button class="btn" data-act="donate-cancel">Cancel</button>';
+}
+
+function bodyCatalog(){
+  var tab=state.ui.catalogTab||'std';
+  var tabs='<div class="cat-tabs">'+
+      '<button class="cat-tab'+(tab==='std'?' on':'')+'" data-act="catalog-tab" data-id="std">Standard</button>'+
+      '<button class="cat-tab'+(tab==='ex'?' on':'')+'" data-act="catalog-tab" data-id="ex">Exclusives</button>'+
+    '</div>';
+  return tabs+'<div class="cat-body">'+(tab==='ex'?catalogExclusives():catalogStandard())+'</div>';
+}
+
+function catalogStandard(){
+  var rows=GARMENT_TYPES.map(function(g){
+    var on=!state.catalogOff[g.id];
+    var pieces=g.parts.map(function(p){ return p.label; }).join(', ');
+    return '<div class="cat-std-row">'+
+      '<div class="csr-txt"><b>'+esc(g.name)+'</b><small>'+esc(pieces)+'</small></div>'+
+      '<button class="switch'+(on?' on':'')+'" data-act="toggle-offering" data-id="'+g.id+'" aria-pressed="'+(on?'true':'false')+'"><i></i></button>'+
+    '</div>';
+  }).join('');
+  return '<div class="hint" style="margin-top:0;">Switch garments on or off. Guests only ask for the ones you offer.</div>'+rows;
+}
+
+function catalogExclusives(){
+  var add='<button class="btn primary" data-act="design-exclusive">+ Design New Exclusive</button>';
+  if (!state.exclusives.length){
+    return '<div class="empty">No exclusives yet. Design a signature piece and it will be listed here for guests to request.</div>'+add;
+  }
+  var cards=state.exclusives.map(function(ex){
+    return '<div class="ex-card">'+
+      '<button class="ex-x" data-act="remove-exclusive" data-id="'+ex.id+'" title="Remove">&times;</button>'+
+      '<div class="ex-art">'+exclusiveArt(ex)+'</div>'+
+      '<div class="ex-name">'+esc(ex.name)+'</div>'+
+      '<div class="ex-val">'+money(ex.value)+'</div>'+
+    '</div>';
+  }).join('');
+  return '<div class="ex-grid">'+cards+'</div>'+add;
 }
 
 function bodyTicketDetail(){
   var t=null;
   for (var i=0;i<state.tickets.length;i++) if (state.tickets[i].id===state.ui.modalId) t=state.tickets[i];
   if (!t) return '<div class="empty">This guest has already left.</div>';
+
+  if (t.exclusiveId){
+    return '<div class="detail-card">'+
+        '<div class="dc-name">'+esc(t.name)+'</div>'+
+        '<div class="dc-req">Requesting Exclusive: '+esc(t.exclusiveName)+'</div>'+
+        '<div class="dc-grid">'+
+          '<div class="dc-block"><div class="lbl">Will Pay Up To</div><div class="budget-big">'+money(t.budget)+'</div></div>'+
+          '<div class="dc-block"><div class="lbl">Brief</div><div class="note">This guest saw one of your signature pieces and wants it. Accept to bring it out and name your price &mdash; no cutting needed.</div></div>'+
+        '</div>'+
+      '</div>'+
+      (state.guest ? '<div class="hint">Finish the current order first.</div>' : '')+
+      '<button class="btn good" data-act="accept" data-id="'+t.id+'" '+(state.guest?'disabled':'')+'>Accept Order</button>'+
+      '<button class="btn bad" data-act="decline" data-id="'+t.id+'">Turn Away</button>';
+  }
 
   var chips=t.wantColors.map(function(cid){
     if (cid==='any') return '<span class="pref-chip">Any color</span>';
@@ -2480,21 +2748,30 @@ function garmentArt(cg){
 
 function bodyPricing(){
   var g=state.guest, cg=state.cutGarment, fp=Math.round(fairPrice());
-  var max=Math.max(Math.round(g.budget*1.4), Math.round(fp*1.5), 10);
+  var isCat=g.catalogDesign;
+  var max=isCat ? Math.max(Math.round(fp*2),10) : Math.max(Math.round(g.budget*1.4), Math.round(fp*1.5), 10);
+  var budgetLine=isCat ? 'List value <b>'+money(fp)+'</b>' : 'Guest budget <b>'+money(g.budget)+'</b>';
+  var hint=isCat
+    ? 'Set the shelf price for this exclusive. Guests who request it will pay up to their own budget.'
+    : 'Fair price sits near '+money(fp)+'. Anything above '+money(g.budget)+' loses the sale outright.';
+  var foot=isCat
+    ? '<button class="btn good" data-act="add-exclusive">Add to Exclusive Catalog</button>'
+    : '<button class="btn good" data-act="present">Present to '+esc(g.name)+'</button>'+
+      '<button class="btn" data-act="add-exclusive">Add to Exclusive Catalog</button>';
   return garmentArt(cg)+
     '<div class="price-line">'+
       'Material cost <b>'+money(cg.cost)+'</b><br>'+
       (cg.custom
-        ? 'Design work <b>'+money(cg.labor)+'</b><br>Pieces <b>'+cg.itemCount+'</b> &middot; Palette match <b>'+Math.round(cg.quality)+'%</b><br>'
+        ? 'Design work <b>'+money(cg.labor||0)+'</b><br>Pieces <b>'+(cg.itemCount||cg.parts.length)+'</b> &middot; Palette match <b>'+Math.round(cg.quality)+'%</b><br>'
         : 'Match quality <b>'+Math.round(cg.quality)+'%</b> &middot; Precision <b>'+Math.round(cg.precisionAvg)+'%</b><br>')+
-      'Guest budget <b>'+money(g.budget)+'</b>'+
+      budgetLine+
     '</div>'+
     '<div class="price-row">'+
       '<input type="range" min="1" max="'+max+'" step="1" value="'+state.price+'" data-act="price">'+
       '<div class="price-val">'+money(state.price)+'</div>'+
     '</div>'+
-    '<div class="hint">Fair price sits near '+money(fp)+'. Anything above '+money(g.budget)+' loses the sale outright.</div>'+
-    '<button class="btn good" data-act="present">Present to '+esc(g.name)+'</button>';
+    '<div class="hint">'+hint+'</div>'+
+    foot;
 }
 
 function bodyResult(){
@@ -2586,7 +2863,8 @@ function renderModal(){
 
   var html='';
   if (m==='shop') html=modalShell('Order Fabric','Cash '+money(state.cash), bodyShop());
-  else if (m==='clearance') html=modalShell('Clearance Rack', state.rack.length+' piece(s)', bodyClearance());
+  else if (m==='clearance') html=modalShell(state.ui.donateMode?'Donate Pieces':'Clearance Rack', state.rack.length+' piece(s)', bodyClearance());
+  else if (m==='catalog') html=modalShell('Catalog','Standard offerings &amp; your exclusives', bodyCatalog(), true, 'catalog');
   else if (m==='ticket') html=modalShell('Order Details','', bodyTicketDetail());
   else if (m==='cutting') html=modalShell('Cutting Table', state.guest?esc(state.guest.garment.name):'', bodyCutting());
   else if (m==='custom') html=modalShell('Custom Design', state.customItems.length+' piece(s)', bodyCustom());
@@ -2664,7 +2942,11 @@ document.addEventListener('click', function(e){
       else if (state.ui.modal==='customcut'){ state.customDraft=null; state.ui.modal='custom'; }
       else if (state.ui.modal==='customasm'){ state.ui.modal='custom'; }
       else if (state.ui.modal==='gameplay'){ state.ui.modal='menu'; }
-      else if (state.ui.modal==='custom'){ state.ui.modal=null; }
+      else if (state.ui.modal==='custom'){
+        if (state.guest && state.guest.catalogDesign){ endCatalogDesign(); state.ui.modal='catalog'; state.ui.catalogTab='ex'; }
+        else state.ui.modal=null;
+      }
+      else if (state.ui.modal==='pricing' && state.guest && state.guest.catalogDesign){ state.ui.modal='custom'; }
       else if (state.ui.modal==='summary'){ /* summary must be acknowledged */ }
       else if (state.ui.modal==='result'){ finishOrder(); return; }
       else if (state.ui.modal==='cutting'||state.ui.modal==='assembly'||state.ui.modal==='pricing'){ state.ui.modal=null; }
@@ -2672,17 +2954,28 @@ document.addEventListener('click', function(e){
       renderModal(); break;
 
     case 'shop': state.ui.modal='shop'; renderModal(); break;
-    case 'clearance': state.ui.modal='clearance'; renderModal(); break;
+    case 'clearance': state.ui.modal='clearance'; state.ui.donateMode=false; state.ui.donateSel=[]; renderModal(); break;
     case 'buy': buyFabric(id,2); state.ui.modal='shop'; renderModal(); break;
     case 'sell-item': sellRackItem(id); state.ui.modal='clearance'; renderModal(); break;
     case 'recycle-item': recycleRackItem(id); state.ui.modal='clearance'; renderModal(); break;
     case 'sell-all': sellAllRack(); state.ui.modal='clearance'; renderModal(); break;
+    case 'donate-start': state.ui.donateMode=true; state.ui.donateSel=[]; renderModal(); break;
+    case 'donate-toggle': toggleDonate(id); break;
+    case 'donate-confirm': confirmDonate(); break;
+    case 'donate-cancel': state.ui.donateMode=false; state.ui.donateSel=[]; renderModal(); break;
+
+    case 'catalog': state.ui.modal='catalog'; state.ui.catalogTab=state.ui.catalogTab||'std'; renderModal(); break;
+    case 'catalog-tab': state.ui.catalogTab=id; renderModal(); break;
+    case 'toggle-offering': toggleOffering(id); break;
+    case 'design-exclusive': startCatalogDesign(); break;
+    case 'remove-exclusive': removeExclusive(id); break;
+    case 'add-exclusive': addExclusive(); break;
 
     case 'open-store': openStore(); break;
     case 'ticket': state.ui.modal='ticket'; state.ui.modalId=id; renderModal(); break;
     case 'accept': acceptTicket(id); break;
     case 'decline': declineTicket(id); break;
-    case 'resume': state.ui.modal=isCustom()?'custom':'cutting'; renderModal(); break;
+    case 'resume': state.ui.modal=state.guest.exclusiveId?'pricing':(isCustom()?'custom':'cutting'); renderModal(); break;
 
     case 'add-item': startCustomItem(); break;
     case 'pick-custom-fabric': pickCustomFabric(id); break;
@@ -2706,6 +2999,13 @@ document.addEventListener('click', function(e){
     case 'present': presentToGuest(); break;
     case 'finish-order': finishOrder(); break;
     case 'abandon':
+      if (state.guest && state.guest.catalogDesign){
+        endCatalogDesign();
+        state.ui.modal='catalog'; state.ui.catalogTab='ex';
+        toast('Design discarded.');
+        renderAll();
+        break;
+      }
       state.guest=null; state.cutting={}; state.assembly=null;
       state.customItems=[]; state.customDraft=null; state.customArrange=null;
       state.ui.modal=null; state.reputation=clamp(state.reputation-2,0,100);
