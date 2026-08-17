@@ -610,7 +610,7 @@ var SAVE_KEY = 'fashionfrenzy_savegame';
 var SETTINGS_KEY = 'fashionfrenzy_settings';
 
 /* Player-tunable gameplay options, persisted separately from the save. */
-var settings = { patience:false, precisionMatters:false, sellingHelp:true, dayMinutes:10 };
+var settings = { patience:false, precisionMatters:false, repTraffic:true, sellingHelp:true, dayMinutes:10 };
 
 function loadSettings(){
   try{
@@ -619,6 +619,7 @@ function loadSettings(){
     var d=JSON.parse(raw);
     if (typeof d.patience==='boolean') settings.patience=d.patience;
     if (typeof d.precisionMatters==='boolean') settings.precisionMatters=d.precisionMatters;
+    if (typeof d.repTraffic==='boolean') settings.repTraffic=d.repTraffic;
     if (typeof d.sellingHelp==='boolean') settings.sellingHelp=d.sellingHelp;
     if (typeof d.dayMinutes==='number') settings.dayMinutes=clamp(d.dayMinutes,1,60);
   }catch(e){}
@@ -724,8 +725,37 @@ var CLOSE_MIN = 1020;           /* 5:00 PM  */
 var DAY_SPAN = CLOSE_MIN - OPEN_MIN;   /* 420 in-game minutes */
 var MAX_ORDERS = 3;   /* tickets in play at once, counting the one being worked */
 
+/* ---- Guest arrival cadence ---- */
+var SPAWN_FIRST = 4;                              /* first guest, minutes after open */
+var SPAWN_MIN = 28, SPAWN_MAX = 55;              /* baseline gap between guests (avg 41.5) */
+var SPAWN_WINDOW = (CLOSE_MIN-40) - (OPEN_MIN+SPAWN_FIRST); /* minutes new orders can arrive */
+var OFF_PER_HOUR = 3;    /* Reputation Traffic OFF: a steady 3 guests per in-game hour */
+var STAR_DAY_0 = 10;     /* Reputation Traffic ON target arrivals/day at 0 stars */
+var STAR_DAY_5 = 70;     /* ...and at 5 stars (2.5 stars keeps the current ~10/day) */
+
 /* How fast the in-game clock runs, derived from the day-length setting. */
 function minPerMs(){ return DAY_SPAN / (clamp(settings.dayMinutes,1,60)*60000); }
+
+/* Target average number of guests for a full day at the current reputation. */
+function guestsPerDayTarget(){
+  var stars=clamp(state.reputation/20,0,5);
+  /* flat ~10/day up to 2.5 stars (matching current pacing), ramping to 70 at 5 stars */
+  if (stars<=2.5) return STAR_DAY_0;
+  return STAR_DAY_0 + (STAR_DAY_5-STAR_DAY_0)*((stars-2.5)/2.5);
+}
+
+/* In-game minutes until the next guest. Reputation Traffic ON scales the gap by
+   reputation (busier shop at higher stars); OFF is a steady per-hour cadence.
+   Budget scaling by reputation is handled separately and applies either way. */
+function nextGuestGap(){
+  if (!settings.repTraffic){
+    return 60/OFF_PER_HOUR;                 /* static, regular: 3 guests per in-game hour */
+  }
+  var target=Math.max(2, guestsPerDayTarget());
+  var avgGap=SPAWN_WINDOW/(target-0.5);     /* arrivals ~= 0.5 + window/avgGap */
+  var f=avgGap/((SPAWN_MIN+SPAWN_MAX)/2);   /* scale the baseline spread to that average */
+  return rnd(SPAWN_MIN*f, SPAWN_MAX*f);
+}
 
 /* ============================= STATE ============================= */
 
@@ -2043,7 +2073,7 @@ function openStore(){
   state.tickets=[];
   state.closingPending=false;
   state.dayStats={ sold:0, earned:0, declined:0, expired:0, repStart:state.reputation };
-  state.nextSpawnAt=OPEN_MIN+4;
+  state.nextSpawnAt=OPEN_MIN+SPAWN_FIRST;
   lastTickMs=Date.now();
   startClock();
   renderAll();
@@ -2076,7 +2106,7 @@ function tick(){
   /* new orders arrive until an hour before close */
   if (state.clock>=state.nextSpawnAt && state.clock<CLOSE_MIN-40 && activeOrderCount()<MAX_ORDERS){
     spawnTicket();
-    state.nextSpawnAt=state.clock+rnd(28,55);
+    state.nextSpawnAt=state.clock+nextGuestGap();
     changed=true;
   }
 
@@ -3235,6 +3265,7 @@ function bodySummary(){
 function bodyGameplay(){
   var on=settings.patience;
   var onPrec=settings.precisionMatters;
+  var onTraffic=settings.repTraffic;
   var onHelp=settings.sellingHelp;
   return '<div class="note" style="margin-top:0;">These options are saved on this device and apply to every day from now on.</div>'+
     '<div class="opt-row">'+
@@ -3244,6 +3275,10 @@ function bodyGameplay(){
     '<div class="opt-row">'+
       '<div class="opt-txt"><b>Precision matters</b><small>When on, sloppy cutting can lose the sale: 85%+ precision always satisfies, under 65% is an automatic no-sale, and anything in between is judged against each customer&rsquo;s own standard. Off by default.</small></div>'+
       '<button class="switch'+(onPrec?' on':'')+'" data-act="toggle-precision" aria-pressed="'+(onPrec?'true':'false')+'"><i></i></button>'+
+    '</div>'+
+    '<div class="opt-row">'+
+      '<div class="opt-txt"><b>Reputation traffic</b><small>When on, your reputation sets how busy the shop is: about 10 guests a day at low stars, rising to around 70 a day at five stars. When off, a steady 3 guests arrive each in-game hour no matter your reputation. Either way, reputation still shapes how much customers will pay. On by default.</small></div>'+
+      '<button class="switch'+(onTraffic?' on':'')+'" data-act="toggle-reptraffic" aria-pressed="'+(onTraffic?'true':'false')+'"><i></i></button>'+
     '</div>'+
     '<div class="opt-row">'+
       '<div class="opt-txt"><b>Selling help</b><small>When on, the Set Your Price screen colours the match quality, precision, and your asking price green, yellow, or red to show how likely the piece is to sell. On by default.</small></div>'+
@@ -3364,6 +3399,11 @@ document.addEventListener('click', function(e){
       settings.precisionMatters=!settings.precisionMatters; saveSettings();
       renderModal();
       toast('Precision matters '+(settings.precisionMatters?'on':'off')+'.');
+      break;
+    case 'toggle-reptraffic':
+      settings.repTraffic=!settings.repTraffic; saveSettings();
+      renderModal();
+      toast('Reputation traffic '+(settings.repTraffic?'on':'off')+'.');
       break;
     case 'close-modal':
       /* leaving a piece's cutting canvas drops back to the table workspace */
@@ -3494,6 +3534,7 @@ renderAll();
 </script>
 </body>
 </html>
+
 
 
 
