@@ -81,7 +81,18 @@
   .stat .k{ font-family:var(--tag); font-size:8px; text-transform:uppercase; color:#8a8069; letter-spacing:0.04em; }
   .stat .v{ font-family:var(--display); font-weight:700; font-size:14px; margin-top:1px; white-space:nowrap; }
   .stat.cash .v{ color:var(--thread-green); }
+  .stat.rep{ cursor:pointer; -webkit-user-select:none; user-select:none; }
   .stat.rep .v{ color:var(--brass); font-size:12px; letter-spacing:-1px; }
+  .stat.rep .v.dec{ letter-spacing:0; font-size:13px; }
+  .stat.rep .rep-mini{ font-size:10px; margin-left:2px; letter-spacing:0; }
+  /* clock card doubles as a day-progress bar that fills toward closing time */
+  .stat.clockstat{ position:relative; overflow:hidden; }
+  .stat.clockstat .clock-fill{
+    position:absolute; left:0; top:0; bottom:0; width:0; z-index:0;
+    background:rgba(62,98,89,0.22); border-right:1px solid rgba(62,98,89,0.32);
+    transition:width 0.4s linear; pointer-events:none;
+  }
+  .stat.clockstat .k, .stat.clockstat .v{ position:relative; z-index:1; }
   .stat.clockstat .v{ font-size:12px; letter-spacing:-0.2px; }
   @media (max-width:360px){
     .hud-stats{ gap:4px; }
@@ -531,6 +542,7 @@
   .tw-inner{ background:transparent; max-width:460px; margin:0 auto; }
   /* keep the muted helper text legible on the warm wood */
   .table-work .hint{ color:#463f30; text-shadow:0 1px 0 rgba(251,247,238,0.35); }
+  .table-work .empty{ color:#463f30; text-shadow:0 1px 0 rgba(251,247,238,0.4); }
   .table-work .quality-row .lbl,
   .table-work .quality-row .pct{ text-shadow:0 1px 0 rgba(251,247,238,0.35); }
 
@@ -558,6 +570,13 @@
   /* a satisfied preference lights up green, with light text for contrast */
   .pref-chip.met{ background:var(--good); border-color:var(--good); color:#fff; }
   .pref-chip.met .dot{ border-color:rgba(255,255,255,0.85); }
+  /* custom-order item rows made compact for the narrow right column */
+  .tw-items .ci-row{ grid-template-columns:38px 1fr 24px; gap:7px; padding:7px 8px; margin-bottom:7px; }
+  .tw-items .ci-thumb{ width:38px; height:36px; }
+  .tw-items .ci-txt b{ font-size:11.5px; }
+  .tw-items .ci-txt small{ font-size:9px; margin-top:1px; }
+  .tw-items .ci-x{ width:24px; height:24px; }
+  .tw-items .tw-additem{ margin-top:2px; }
   /* action row mirrors the columns: abandon under wants, assembly under items */
   .tw-actions{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:11px; }
   .tw-actions .btn{ margin-top:0; }
@@ -736,7 +755,7 @@ function freshState(){
     price:0,
     lastResult:null,
     ui:{ modal:null, tracePart:null, modalId:null, fabricOpen:true,
-         catalogTab:'std', donateMode:false, donateSel:[], shopColor:null }
+         catalogTab:'std', donateMode:false, donateSel:[], shopColor:null, repDecimal:false }
   };
 }
 
@@ -1468,15 +1487,15 @@ function finishCustomItem(){
 
   state.customDraft=null;
   state.customArrange=null;   /* arrangement is rebuilt when the set changes */
-  state.ui.modal='custom';
+  state.ui.modal=customHome();
   toast(name+' cut &middot; '+yards.toFixed(2)+' yd used');
-  renderModal();
+  renderAll();
 }
 
 function removeCustomItem(id){
   state.customItems=state.customItems.filter(function(i){ return i.id!==id; });
   state.customArrange=null;
-  renderModal();
+  renderAll();
 }
 
 function initCustomArrange(){
@@ -1541,14 +1560,14 @@ function proceedCustom(){
     state.price=Math.round(clamp(fairPrice(),1,state.guest.budget*1.4));
     state.ui.modal='pricing';
   }
-  renderModal();
+  renderAll();
 }
 
 function proceedCustomAssembly(){
   state.cutGarment=buildCustomGarment();
   state.price=Math.round(clamp(fairPrice(),1,state.guest.budget*1.4));
   state.ui.modal='pricing';
-  renderModal();
+  renderAll();
 }
 
 /* ============================= CATALOG & EXCLUSIVES ============================= */
@@ -1831,9 +1850,8 @@ function acceptTicket(tid){
   state.guest=t;
   state.cutting={}; state.assembly=null; state.cutGarment=null; state.price=0; state.lastResult=null;
   state.customItems=[]; state.customDraft=null; state.customArrange=null;
-  /* Standard orders are worked right on the table (no modal); custom orders
-     still open the interactive design surface. */
-  state.ui.modal=state.guest.custom ? 'custom' : null;
+  /* Both standard and custom orders are worked right on the table (no modal). */
+  state.ui.modal=null;
   state.ui.tracePart=null;
   renderAll();
 }
@@ -2166,6 +2184,12 @@ function renderHUD(){
   var stars='';
   var sc=Math.round(state.reputation/20);
   for (var i=0;i<5;i++) stars += (i<sc?'&starf;':'&star;');
+  /* the reputation card flips between a five-star view and the exact decimal */
+  var repV = state.ui.repDecimal
+    ? '<div class="v dec">'+(state.reputation/20).toFixed(2)+'<span class="rep-mini">&starf;</span></div>'
+    : '<div class="v">'+stars+'</div>';
+  /* the clock card fills like a progress bar from open to close */
+  var clockPct=clamp((state.clock-OPEN_MIN)/DAY_SPAN*100,0,100);
   document.getElementById('hud').innerHTML =
     '<div class="hud-top">'+
       '<div class="hud-title">Fashion Frenzy<span>Atelier &amp; Cutting Table</span></div>'+
@@ -2173,9 +2197,13 @@ function renderHUD(){
     '</div>'+
     '<div class="hud-stats">'+
       '<div class="stat cash"><div class="k">Cash</div><div class="v">'+money(state.cash)+'</div></div>'+
-      '<div class="stat rep"><div class="k">Reputation</div><div class="v">'+stars+'</div></div>'+
+      '<div class="stat rep" data-act="flip-rep" title="Tap to flip"><div class="k">Reputation</div>'+repV+'</div>'+
       '<div class="stat"><div class="k">Sales</div><div class="v">'+money(state.totalSales)+'</div></div>'+
-      '<div class="stat clockstat"><div class="k">Day '+state.day+'</div><div class="v" id="hud-time">'+fmtClock(state.clock)+'</div></div>'+
+      '<div class="stat clockstat">'+
+        '<span class="clock-fill" id="hud-fill" style="width:'+clockPct.toFixed(1)+'%"></span>'+
+        '<div class="k">Day '+state.day+'</div>'+
+        '<div class="v" id="hud-time">'+fmtClock(state.clock)+'</div>'+
+      '</div>'+
     '</div>';
 }
 
@@ -2253,6 +2281,8 @@ function fitScene(){
 function updateClockUI(){
   var t=document.getElementById('hud-time');
   if (t) t.textContent=fmtClock(state.clock);
+  var f=document.getElementById('hud-fill');
+  if (f) f.style.width=clamp((state.clock-OPEN_MIN)/DAY_SPAN*100,0,100).toFixed(1)+'%';
 }
 
 /* ============================= RENDER: TRAY ============================= */
@@ -2518,19 +2548,25 @@ function requirementStrip(){
   '</div>';
 }
 
-/* True when a standard order should be worked directly on the table
-   (guest present, not a custom/exclusive/catalog job, and no modal open). */
+/* True when an accepted order (standard OR custom) should be worked directly on
+   the table: a guest is present, it isn't an exclusive/catalog job, and no
+   step-modal is open. */
 function tableWorkActive(){
-  return !!state.guest && !state.guest.custom && !state.guest.exclusiveId &&
+  return !!state.guest && !state.guest.exclusiveId &&
          !state.guest.catalogDesign && !state.ui.modal && state.phase!=='summary';
 }
+
+/* Where the custom-design overview lives: on the table for an accepted guest
+   order, or in the modal for a catalog (house exclusive) design session. */
+function customHome(){ return (state.guest && state.guest.catalogDesign) ? 'custom' : null; }
 
 /* The order's working cards + buttons, laid out directly on the wooden table
    surface (transparent container) instead of popping up as a modal. The panel
    is anchored inside the aspect-locked stage so it stays within the wood no
    matter the screen size. */
 function tableWorkHTML(){
-  return '<div class="table-work"><div class="tw-inner">'+ bodyCutting() +'</div></div>';
+  var inner = state.guest.custom ? bodyCustom() : bodyCutting();
+  return '<div class="table-work"><div class="tw-inner">'+ inner +'</div></div>';
 }
 
 /* A stroke outline of a garment piece's shape, tinted with the chosen fabric
@@ -2674,22 +2710,32 @@ function bodyTrace(){
 
 function bodyCustom(){
   var g=state.guest;
+  /* which requested colours the player has already used, to light up green */
+  var usedColors={}, anyItem=state.customItems.length>0;
+  state.customItems.forEach(function(it){ var f=fabricById(it.fabricId); if(f) usedColors[f.colorId]=true; });
   var chips=g.wantColors.map(function(cid){
-    if (cid==='any') return '<span class="pref-chip sm">Any color</span>';
+    if (cid==='any') return '<span class="pref-chip sm'+(anyItem?' met':'')+'">Any color</span>';
     var c=COLORS.filter(function(x){ return x.id===cid; })[0];
-    return '<span class="pref-chip sm"><span class="dot" style="background:'+c.hex+'"></span>'+c.name+'</span>';
+    var met=usedColors[cid];
+    return '<span class="pref-chip sm'+(met?' met':'')+'"><span class="dot" style="background:'+c.hex+'"></span>'+c.name+'</span>';
   }).join('');
+
+  var wants='<div class="req-strip">'+
+      '<div class="rs-name">'+esc(g.name)+' wants a custom design</div>'+
+      '<div class="rs-line"><span class="rs-k">Colors</span><span class="rs-v">'+chips+'</span></div>'+
+      '<div class="rs-line"><span class="rs-k">Budget</span><span class="rs-v rs-budget">'+money(g.budget)+'</span></div>'+
+    '</div>';
 
   var list;
   if (!state.customItems.length){
-    list='<div class="empty">No pieces yet. Add at least one item to build this outfit.</div>';
+    list='<div class="empty">No pieces yet &mdash; add one to start.</div>';
   } else {
     list=state.customItems.map(function(it){
       var f=fabricById(it.fabricId);
       return '<div class="ci-row">'+
-        '<div class="ci-thumb">'+piecePolySVG(it.fabricId, it.cutShape, 44, 44, 2)+'</div>'+
+        '<div class="ci-thumb">'+piecePolySVG(it.fabricId, it.cutShape, 38, 38, 2)+'</div>'+
         '<div class="ci-txt"><b>'+esc(it.name)+'</b>'+
-          '<small>'+f.colorName+' '+f.patternName+' &middot; '+it.yards.toFixed(2)+' yd &middot; '+money(it.cost)+
+          '<small>'+f.colorName+' '+f.patternName+' &middot; '+it.yards.toFixed(2)+' yd'+
           (it.colorMatch?' &middot; on palette':' &middot; off palette')+'</small></div>'+
         '<button class="ci-x" data-act="remove-item" data-id="'+it.id+'" title="Remove">&times;</button>'+
       '</div>';
@@ -2697,17 +2743,22 @@ function bodyCustom(){
   }
 
   var n=state.customItems.length;
-  var sellLabel = n>1 ? 'Arrange &amp; Sell ('+n+' pieces)' : 'Sell As Is';
-  return '<div class="req-strip">'+
-      '<div class="rs-name">'+esc(g.name)+' wants a custom design</div>'+
-      '<div class="rs-line"><span class="rs-k">Colors</span><span class="rs-v">'+chips+'</span></div>'+
-      '<div class="rs-line"><span class="rs-k">Budget</span><span class="rs-v rs-budget">'+money(g.budget)+'</span></div>'+
+  var sellLabel = n>1 ? 'Arrange &amp; Sell' : 'Sell As Is';
+  return '<div class="tw-grid">'+
+      '<div class="tw-col tw-wants">'+
+        '<div class="tw-col-h">What they want</div>'+
+        wants+
+      '</div>'+
+      '<div class="tw-col tw-items">'+
+        '<div class="tw-col-h">Cut &amp; add</div>'+
+        list+
+        '<button class="btn primary tw-additem" data-act="add-item">+ Add Item</button>'+
+      '</div>'+
     '</div>'+
-    '<div class="hint" style="margin-top:0;">Design it however you like. Add a piece, choose cloth, and cut any shape you want.</div>'+
-    list+
-    '<button class="btn primary" data-act="add-item">+ Add Item</button>'+
-    '<button class="btn good" data-act="custom-proceed" '+(n?'':'disabled')+'>'+sellLabel+'</button>'+
-    '<button class="btn" data-act="abandon">Abandon This Order</button>';
+    '<div class="tw-actions">'+
+      '<button class="btn tw-abandon" data-act="abandon">Abandon</button>'+
+      '<button class="btn good tw-proceed" data-act="custom-proceed" '+(n?'':'disabled')+'>'+sellLabel+'</button>'+
+    '</div>';
 }
 
 function bodyCustomCut(){
@@ -3297,6 +3348,7 @@ document.addEventListener('click', function(e){
 
   switch(act){
     case 'menu': state.ui.modal='menu'; renderModal(); break;
+    case 'flip-rep': state.ui.repDecimal=!state.ui.repDecimal; renderHUD(); break;
     case 'gameplay': state.ui.modal='gameplay'; renderModal(); break;
     case 'toggle-patience':
       settings.patience=!settings.patience; saveSettings();
@@ -3316,14 +3368,14 @@ document.addEventListener('click', function(e){
     case 'close-modal':
       /* leaving a piece's cutting canvas drops back to the table workspace */
       if (state.ui.modal==='trace'){ state.ui.modal=null; state.ui.tracePart=null; }
-      else if (state.ui.modal==='customcut'){ state.customDraft=null; state.ui.modal='custom'; }
-      else if (state.ui.modal==='customasm'){ state.ui.modal='custom'; }
+      else if (state.ui.modal==='customcut'){ state.customDraft=null; state.ui.modal=customHome(); }
+      else if (state.ui.modal==='customasm'){ state.ui.modal=customHome(); }
       else if (state.ui.modal==='gameplay'){ state.ui.modal='menu'; }
       else if (state.ui.modal==='custom'){
         if (state.guest && state.guest.catalogDesign){ endCatalogDesign(); state.ui.modal='catalog'; state.ui.catalogTab='ex'; }
         else state.ui.modal=null;
       }
-      else if (state.ui.modal==='pricing' && state.guest && state.guest.catalogDesign){ state.ui.modal='custom'; }
+      else if (state.ui.modal==='pricing' && state.guest && state.guest.custom){ state.ui.modal=customHome(); }
       else if (state.ui.modal==='summary'){ /* summary must be acknowledged */ }
       else if (state.ui.modal==='result'){ finishOrder(); return; }
       else if (state.ui.modal==='assembly'||state.ui.modal==='pricing'){ state.ui.modal=null; }
@@ -3354,7 +3406,7 @@ document.addEventListener('click', function(e){
     case 'ticket': state.ui.modal='ticket'; state.ui.modalId=id; renderModal(); break;
     case 'accept': acceptTicket(id); break;
     case 'decline': declineTicket(id); break;
-    case 'resume': state.ui.modal=state.guest.exclusiveId?'pricing':(isCustom()?'custom':null); renderAll(); break;
+    case 'resume': state.ui.modal=state.guest.exclusiveId?'pricing':null; renderAll(); break;
 
     case 'add-item': startCustomItem(); break;
     case 'pick-custom-fabric': pickCustomFabric(id); break;
@@ -3363,7 +3415,7 @@ document.addEventListener('click', function(e){
     case 'remove-item': removeCustomItem(id); break;
     case 'custom-proceed': proceedCustom(); break;
     case 'custom-asm-done': proceedCustomAssembly(); break;
-    case 'back-to-custom': state.ui.modal='custom'; renderModal(); break;
+    case 'back-to-custom': state.ui.modal=customHome(); renderAll(); break;
     case 'open-piece':
       state.ui.tracePart=part;
       state.ui.fabricOpen=!(state.cutting[part] && state.cutting[part].fabricId);
@@ -3442,6 +3494,7 @@ renderAll();
 </script>
 </body>
 </html>
+
 
 
 
