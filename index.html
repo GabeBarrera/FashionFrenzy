@@ -472,7 +472,7 @@ var SAVE_KEY = 'fashionfrenzy_savegame';
 var SETTINGS_KEY = 'fashionfrenzy_settings';
 
 /* Player-tunable gameplay options, persisted separately from the save. */
-var settings = { patience:false, precisionMatters:false, dayMinutes:5 };
+var settings = { patience:false, precisionMatters:false, sellingHelp:true, dayMinutes:10 };
 
 function loadSettings(){
   try{
@@ -481,6 +481,7 @@ function loadSettings(){
     var d=JSON.parse(raw);
     if (typeof d.patience==='boolean') settings.patience=d.patience;
     if (typeof d.precisionMatters==='boolean') settings.precisionMatters=d.precisionMatters;
+    if (typeof d.sellingHelp==='boolean') settings.sellingHelp=d.sellingHelp;
     if (typeof d.dayMinutes==='number') settings.dayMinutes=clamp(d.dayMinutes,1,60);
   }catch(e){}
 }
@@ -1668,6 +1669,22 @@ function buildCutGarment(){
 function baseValue(cg){ return cg.cost + (cg.labor||0); }
 function fairPrice(){ var c=state.cutGarment; return baseValue(c)*(1.2+c.quality/100); }
 
+/* ---- Selling Help colour cues (green = likely, brass = risky, red = won't sell) ---- */
+function qualityColor(q){ return q>=68?'var(--good)':(q>=52?'var(--brass)':'var(--bad)'); }
+function precisionColor(p){
+  if (!settings.precisionMatters) return 'var(--good)';   /* precision can't lose the sale when the rule is off */
+  return p>=85?'var(--good)':(p>=65?'var(--brass)':'var(--bad)');
+}
+function priceIndicatorColor(){
+  var g=state.guest, cg=state.cutGarment;
+  if (!g || !cg) return 'var(--ink)';
+  var fp=fairPrice(), isCat=g.catalogDesign;
+  if (!isCat && state.price>g.budget) return 'var(--bad)';   /* over budget = lost outright */
+  if (state.price<=fp) return 'var(--good)';                 /* at or under fair = best odds */
+  if (isCat) return 'var(--brass)';
+  return state.price<=g.budget ? 'var(--brass)' : 'var(--bad)';
+}
+
 function proceedFromCutting(){
   var g=state.guest;
   if (!g.garment.parts.every(function(p){ return state.cutting[p.id] && state.cutting[p.id].done; })){
@@ -2748,29 +2765,48 @@ function garmentArt(cg){
 
 function bodyPricing(){
   var g=state.guest, cg=state.cutGarment, fp=Math.round(fairPrice());
-  var isCat=g.catalogDesign;
+  var isCat=g.catalogDesign, help=settings.sellingHelp;
   var max=isCat ? Math.max(Math.round(fp*2),10) : Math.max(Math.round(g.budget*1.4), Math.round(fp*1.5), 10);
-  var budgetLine=isCat ? 'List value <b>'+money(fp)+'</b>' : 'Guest budget <b>'+money(g.budget)+'</b>';
-  var hint=isCat
-    ? 'Set the shelf price for this exclusive. Guests who request it will pay up to their own budget.'
-    : 'Fair price sits near '+money(fp)+'. Anything above '+money(g.budget)+' loses the sale outright.';
+
+  /* wrap a value in a colour cue only when Selling Help is on */
+  function cue(txt, color){ return help ? '<b style="color:'+color+'">'+txt+'</b>' : '<b>'+txt+'</b>'; }
+
+  /* quality / precision (or, for custom pieces, the palette-match line) */
+  var qualLine;
+  if (cg.custom){
+    qualLine='Design work <b>'+money(cg.labor||0)+'</b><br>Pieces <b>'+(cg.itemCount||cg.parts.length)+'</b>'+
+      ' &middot; Palette match '+cue(Math.round(cg.quality)+'%', qualityColor(cg.quality))+'<br>';
+  } else {
+    qualLine='Match quality '+cue(Math.round(cg.quality)+'%', qualityColor(cg.quality))+
+      ' &middot; Precision '+cue(Math.round(cg.precisionAvg)+'%', precisionColor(cg.precisionAvg))+'<br>';
+  }
+
+  var budgetLine = isCat ? '' : 'Guest budget <b>'+money(g.budget)+'</b>';
+  var priceStyle = help ? ' style="color:'+priceIndicatorColor()+'"' : '';
+
+  /* hint text: only the Selling Help legend, or the catalog note; otherwise nothing */
+  var hint='';
+  if (isCat) hint='Set the shelf price for this exclusive. Guests who request it will pay up to their own budget.';
+  else if (help) hint='Colour cues show your odds: <b style="color:var(--good)">green</b> likely sale, '+
+    '<b style="color:var(--brass)">yellow</b> risky, <b style="color:var(--bad)">red</b> won&rsquo;t sell.';
+
   var foot=isCat
     ? '<button class="btn good" data-act="add-exclusive">Add to Exclusive Catalog</button>'
     : '<button class="btn good" data-act="present">Present to '+esc(g.name)+'</button>'+
       '<button class="btn" data-act="add-exclusive">Add to Exclusive Catalog</button>';
+
   return garmentArt(cg)+
     '<div class="price-line">'+
       'Material cost <b>'+money(cg.cost)+'</b><br>'+
-      (cg.custom
-        ? 'Design work <b>'+money(cg.labor||0)+'</b><br>Pieces <b>'+(cg.itemCount||cg.parts.length)+'</b> &middot; Palette match <b>'+Math.round(cg.quality)+'%</b><br>'
-        : 'Match quality <b>'+Math.round(cg.quality)+'%</b> &middot; Precision <b>'+Math.round(cg.precisionAvg)+'%</b><br>')+
+      'Fair price <b>'+money(fp)+'</b><br>'+
+      qualLine+
       budgetLine+
     '</div>'+
     '<div class="price-row">'+
       '<input type="range" min="1" max="'+max+'" step="1" value="'+state.price+'" data-act="price">'+
-      '<div class="price-val">'+money(state.price)+'</div>'+
+      '<div class="price-val"'+priceStyle+'>'+money(state.price)+'</div>'+
     '</div>'+
-    '<div class="hint">'+hint+'</div>'+
+    (hint?'<div class="hint">'+hint+'</div>':'')+
     foot;
 }
 
@@ -2817,6 +2853,7 @@ function bodySummary(){
 function bodyGameplay(){
   var on=settings.patience;
   var onPrec=settings.precisionMatters;
+  var onHelp=settings.sellingHelp;
   return '<div class="note" style="margin-top:0;">These options are saved on this device and apply to every day from now on.</div>'+
     '<div class="opt-row">'+
       '<div class="opt-txt"><b>Guest patience</b><small>When on, waiting guests eventually give up and leave, costing reputation. Off by default.</small></div>'+
@@ -2825,6 +2862,10 @@ function bodyGameplay(){
     '<div class="opt-row">'+
       '<div class="opt-txt"><b>Precision matters</b><small>When on, sloppy cutting can lose the sale: 85%+ precision always satisfies, under 65% is an automatic no-sale, and anything in between is judged against each customer&rsquo;s own standard. Off by default.</small></div>'+
       '<button class="switch'+(onPrec?' on':'')+'" data-act="toggle-precision" aria-pressed="'+(onPrec?'true':'false')+'"><i></i></button>'+
+    '</div>'+
+    '<div class="opt-row">'+
+      '<div class="opt-txt"><b>Selling help</b><small>When on, the Set Your Price screen colours the match quality, precision, and your asking price green, yellow, or red to show how likely the piece is to sell. On by default.</small></div>'+
+      '<button class="switch'+(onHelp?' on':'')+'" data-act="toggle-selling" aria-pressed="'+(onHelp?'true':'false')+'"><i></i></button>'+
     '</div>'+
     '<div class="opt-row col">'+
       '<div class="opt-txt"><b>Day length</b><small>How much real time one workday (10:00 AM to 5:00 PM) takes.</small></div>'+
@@ -2932,6 +2973,11 @@ document.addEventListener('click', function(e){
       renderModal(); renderTray();
       toast('Guest patience '+(settings.patience?'on':'off')+'.');
       break;
+    case 'toggle-selling':
+      settings.sellingHelp=!settings.sellingHelp; saveSettings();
+      renderModal();
+      toast('Selling help '+(settings.sellingHelp?'on':'off')+'.');
+      break;
     case 'toggle-precision':
       settings.precisionMatters=!settings.precisionMatters; saveSettings();
       renderModal();
@@ -3036,7 +3082,10 @@ document.addEventListener('input', function(e){
   if (e.target.getAttribute && e.target.getAttribute('data-act')==='price'){
     state.price=parseInt(e.target.value,10);
     var v=document.querySelector('.price-val');
-    if (v) v.textContent=money(state.price);
+    if (v){
+      v.textContent=money(state.price);
+      if (settings.sellingHelp) v.style.color=priceIndicatorColor();
+    }
   }
 });
 
