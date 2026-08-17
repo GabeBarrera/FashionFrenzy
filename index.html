@@ -519,6 +519,46 @@
   .prompt-actions{ display:flex; gap:8px; margin-top:12px; }
   .prompt-actions .btn{ margin-top:0; }
 
+  /* order worked directly on the wooden table (replaces the cutting modal).
+     Anchored inside the aspect-locked stage over the wood region (which starts
+     ~46% down the artwork), so the cards never spill onto the wall or shelves.
+     The container is fully transparent so the cards sit right on the wood. */
+  .table-work{
+    position:absolute; z-index:6; overflow-y:auto; overflow-x:hidden;
+    -webkit-overflow-scrolling:touch; background:transparent;
+    padding:10px 5% calc(env(safe-area-inset-bottom,0px) + 12px);
+  }
+  .tw-inner{ background:transparent; max-width:460px; margin:0 auto; }
+  /* keep the muted helper text legible on the warm wood */
+  .table-work .hint{ color:#463f30; text-shadow:0 1px 0 rgba(251,247,238,0.35); }
+  .table-work .quality-row .lbl,
+  .table-work .quality-row .pct{ text-shadow:0 1px 0 rgba(251,247,238,0.35); }
+
+  /* two columns: wants (left) | items to cut & add (right) */
+  .tw-grid{ display:grid; grid-template-columns:1fr 1fr; gap:9px; align-items:start; }
+  .tw-col{ min-width:0; }
+  .tw-col-h{
+    font-family:var(--tag); font-size:9px; text-transform:uppercase; letter-spacing:0.06em;
+    color:#3a3324; text-shadow:0 1px 0 rgba(251,247,238,0.45); margin:0 0 6px; text-align:center;
+  }
+  .tw-wants .req-strip{ margin-bottom:0; }
+  .tw-items .piece-btn{
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:10px 8px; margin-bottom:9px;
+  }
+  .tw-items .piece-btn:last-child{ margin-bottom:0; }
+  .pb-art{
+    width:100%; display:flex; align-items:flex-end; justify-content:center;
+    height:62px; margin-bottom:7px;
+  }
+  .pb-art .pb-outline-svg{ display:block; }
+  .tw-items .pb-title{ font-size:11px; line-height:1.15; }
+  .tw-items .pb-yards{ margin:2px 0 6px; }
+  .tw-items .pb-status{ font-size:9.5px; padding:4px 8px; }
+  /* action row mirrors the columns: abandon under wants, assembly under items */
+  .tw-actions{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:11px; }
+  .tw-actions .btn{ margin-top:0; }
+
   ::-webkit-scrollbar{ width:7px; height:7px; }
   ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
 
@@ -1788,7 +1828,9 @@ function acceptTicket(tid){
   state.guest=t;
   state.cutting={}; state.assembly=null; state.cutGarment=null; state.price=0; state.lastResult=null;
   state.customItems=[]; state.customDraft=null; state.customArrange=null;
-  state.ui.modal=state.guest.custom ? 'custom' : 'cutting';
+  /* Standard orders are worked right on the table (no modal); custom orders
+     still open the interactive design surface. */
+  state.ui.modal=state.guest.custom ? 'custom' : null;
   state.ui.tracePart=null;
   renderAll();
 }
@@ -1846,14 +1888,14 @@ function proceedFromCutting(){
   state.cutGarment=buildCutGarment();
   if (g.garment.parts.length>1){ initAssemblyState(); state.ui.modal='assembly'; }
   else { state.price=Math.round(clamp(fairPrice(),1,g.budget*1.4)); state.ui.modal='pricing'; }
-  renderModal();
+  renderAll();
 }
 
 function proceedFromAssembly(){
   if (!assemblyAllPlaced()){ toast('Place every piece in its outline.'); return; }
   state.price=Math.round(clamp(fairPrice(),1,state.guest.budget*1.4));
   state.ui.modal='pricing';
-  renderModal();
+  renderAll();
 }
 
 function presentToGuest(){
@@ -2167,6 +2209,7 @@ function renderScene(){
         '<span class="hs-label">Catalog'+ (state.exclusives.length?'<span class="hs-badge">'+state.exclusives.length+'</span>':'') +'</span>'+
       '</button>'+
     '</div>'+
+    (tableWorkActive() ? tableWorkHTML() : '')+
     veil;
 
   fitScene();
@@ -2176,6 +2219,7 @@ function renderScene(){
    while the aspect-locked stage keeps hotspots pinned to the artwork. */
 var IMG_RATIO = 1.79082;           /* image height / width */
 var SCENE_VISIBLE = 0.44;          /* fraction of image height that must remain visible */
+var WOOD_TOP = 0.455;              /* where the wooden table surface begins in the artwork */
 function fitScene(){
   var scene=document.getElementById('scene');
   var stage=document.getElementById('scene-stage');
@@ -2184,6 +2228,23 @@ function fitScene(){
   if (!availW || !availH) return;
   var maxW=availH/(IMG_RATIO*SCENE_VISIBLE);
   stage.style.width=Math.max(160, Math.min(availW, maxW))+'px';
+
+  /* Pin the on-table work panel to the wood: it spans from the table's front
+     edge down to the bottom of the visible scene, and never onto the wall. */
+  var tw=scene.querySelector('.table-work');
+  if (tw){
+    var stageW=stage.offsetWidth, stageH=stage.offsetHeight||stageW*IMG_RATIO;
+    var stageLeft=stage.offsetLeft, stageTop=stage.offsetTop;
+    var woodTop=stageTop + WOOD_TOP*stageH;
+    /* only override if the table edge sits entirely below the fold, so the panel
+       never rides up onto the wall/shelves */
+    if (woodTop>=availH) woodTop=availH*0.5;
+    woodTop=Math.max(0, woodTop);
+    tw.style.left=stageLeft+'px';
+    tw.style.width=stageW+'px';
+    tw.style.top=Math.round(woodTop)+'px';
+    tw.style.bottom='0px';
+  }
 }
 
 function updateClockUI(){
@@ -2436,31 +2497,83 @@ function requirementStrip(){
   '</div>';
 }
 
+/* True when a standard order should be worked directly on the table
+   (guest present, not a custom/exclusive/catalog job, and no modal open). */
+function tableWorkActive(){
+  return !!state.guest && !state.guest.custom && !state.guest.exclusiveId &&
+         !state.guest.catalogDesign && !state.ui.modal && state.phase!=='summary';
+}
+
+/* The order's working cards + buttons, laid out directly on the wooden table
+   surface (transparent container) instead of popping up as a modal. The panel
+   is anchored inside the aspect-locked stage so it stays within the wood no
+   matter the screen size. */
+function tableWorkHTML(){
+  return '<div class="table-work"><div class="tw-inner">'+ bodyCutting() +'</div></div>';
+}
+
+/* A stroke outline of a garment piece's shape, tinted with the chosen fabric
+   once one is picked. Shown inside the item button for non-custom orders. */
+function pieceOutlineSVG(shapeKey, fabricId, maxW, maxH){
+  if (!shapeKey || !SHAPES[shapeKey]) return '';
+  var pts=shapePoints(shapeKey); if (!pts || pts.length<3) return '';
+  var xs=pts.map(function(p){return p.x;}), ys=pts.map(function(p){return p.y;});
+  var minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs);
+  var minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
+  var bw=Math.max(0.001,maxX-minX), bh=Math.max(0.001,maxY-minY);
+  var aspect=bw/bh, w=maxW, h=w/aspect;
+  if (h>maxH){ h=maxH; w=h*aspect; }
+  var sw=2, iw=Math.max(1,w-sw), ih=Math.max(1,h-sw);
+  var poly=pts.map(function(p){
+    return (sw/2+(p.x-minX)/bw*iw).toFixed(1)+','+(sw/2+(p.y-minY)/bh*ih).toFixed(1);
+  }).join(' ');
+  var f=fabricId?fabricById(fabricId):null;
+  var fill=f?f.hex:'rgba(43,38,32,0.05)';
+  return '<svg class="pb-outline-svg" width="'+w.toFixed(1)+'" height="'+h.toFixed(1)+'" viewBox="0 0 '+w.toFixed(1)+' '+h.toFixed(1)+'">'+
+    '<polygon points="'+poly+'" fill="'+fill+'" stroke="#2B2620" stroke-width="'+sw+'" stroke-linejoin="round"/></svg>';
+}
+
 function bodyCutting(){
   var g=state.guest, q=currentOverallQuality();
   var col=q.pct>=75?'var(--good)':(q.pct>=45?'var(--brass)':'var(--bad)');
+  var isCustom=!!g.custom;
   var btns=g.garment.parts.map(function(p){
     var st=state.cutting[p.id], cls, lbl, sw='';
     if (st && st.done){ cls='done'; lbl='&check; Cut &middot; '+Math.round(st.precision)+'% precision'; }
     else if (st && st.fabricId){ cls='progress'; lbl=Math.round(piecePercentCut(st))+'% cut'; }
     else { cls='pending'; lbl='Not started'; }
     if (st && st.fabricId) sw='<span class="pb-sw" style="background:'+swatchBg(fabricById(st.fabricId))+'"></span>';
+    var art = (!isCustom && p.shape)
+      ? '<div class="pb-art">'+pieceOutlineSVG(p.shape, (st&&st.fabricId)?st.fabricId:null, 48, 60)+'</div>'
+      : '';
     return '<button class="piece-btn" data-act="open-piece" data-part="'+p.id+'">'+
-      '<div class="pb-title">'+p.label+'</div>'+
-      '<div class="pb-yards">needs '+p.yards+' yd</div>'+
-      '<span class="pb-status '+cls+'">'+sw+lbl+'</span>'+
+      art+
+      '<div class="pb-txt">'+
+        '<div class="pb-title">'+p.label+'</div>'+
+        '<div class="pb-yards">needs '+p.yards+' yd</div>'+
+        '<span class="pb-status '+cls+'">'+sw+lbl+'</span>'+
+      '</div>'+
     '</button>';
   }).join('');
   var all=g.garment.parts.every(function(p){ return state.cutting[p.id] && state.cutting[p.id].done; });
   var next=g.garment.parts.length>1?'Go to Assembly':'Price This Piece';
-  return requirementStrip()+
-    '<div class="hint" style="margin-top:0;">Tap a piece to pick its fabric and cut it out on the table.</div>'+
-    btns+
+  return '<div class="tw-grid">'+
+      '<div class="tw-col tw-wants">'+
+        '<div class="tw-col-h">What they want</div>'+
+        requirementStrip()+
+      '</div>'+
+      '<div class="tw-col tw-items">'+
+        '<div class="tw-col-h">Cut &amp; add</div>'+
+        btns+
+      '</div>'+
+    '</div>'+
     '<div class="quality-row"><span class="lbl">Overall Match</span>'+
       '<div class="wrap"><i style="width:'+q.pct+'%; background:'+col+';"></i></div>'+
       '<div class="pct">'+Math.round(q.pct)+'%</div></div>'+
-    '<button class="btn primary" data-act="proceed-cut" '+(all?'':'disabled')+'>'+next+'</button>'+
-    '<button class="btn" data-act="abandon">Abandon This Order</button>';
+    '<div class="tw-actions">'+
+      '<button class="btn tw-abandon" data-act="abandon">Abandon</button>'+
+      '<button class="btn primary tw-proceed" data-act="proceed-cut" '+(all?'':'disabled')+'>'+next+'</button>'+
+    '</div>';
 }
 
 function bodyTrace(){
@@ -3105,7 +3218,6 @@ function renderModal(){
   else if (m==='clearance') html=modalShell(state.ui.donateMode?'Donate Pieces':'Clearance Rack', state.rack.length+' piece(s)', bodyClearance());
   else if (m==='catalog') html=modalShell('Catalog','Standard offerings &amp; your exclusives', bodyCatalog(), true, 'catalog');
   else if (m==='ticket') html=modalShell('Order Details','', bodyTicketDetail());
-  else if (m==='cutting') html=modalShell('Cutting Table', state.guest?esc(state.guest.garment.name):'', bodyCutting());
   else if (m==='custom') html=modalShell('Custom Design', state.customItems.length+' piece(s)', bodyCustom());
   else if (m==='customcut') html=modalShell('New Piece','Cut it however you like', bodyCustomCut(), true, 'trace');
   else if (m==='customasm') html=modalShell('Arrange the Outfit','Free placement', bodyCustomAssembly(), true);
@@ -3154,7 +3266,7 @@ document.addEventListener('click', function(e){
   if (veil){
     /* tapping the dimmed area closes only light-weight modals */
     var m=state.ui.modal;
-    if (m==='shop'||m==='clearance'||m==='ticket'||m==='menu'||m==='gameplay'){ state.ui.modal=null; renderModal(); }
+    if (m==='shop'||m==='clearance'||m==='ticket'||m==='menu'||m==='gameplay'){ state.ui.modal=null; renderAll(); }
     return;
   }
   var el=e.target.closest('[data-act]');
@@ -3182,7 +3294,8 @@ document.addEventListener('click', function(e){
       toast('Precision matters '+(settings.precisionMatters?'on':'off')+'.');
       break;
     case 'close-modal':
-      if (state.ui.modal==='trace'){ state.ui.modal='cutting'; state.ui.tracePart=null; }
+      /* leaving a piece's cutting canvas drops back to the table workspace */
+      if (state.ui.modal==='trace'){ state.ui.modal=null; state.ui.tracePart=null; }
       else if (state.ui.modal==='customcut'){ state.customDraft=null; state.ui.modal='custom'; }
       else if (state.ui.modal==='customasm'){ state.ui.modal='custom'; }
       else if (state.ui.modal==='gameplay'){ state.ui.modal='menu'; }
@@ -3193,9 +3306,9 @@ document.addEventListener('click', function(e){
       else if (state.ui.modal==='pricing' && state.guest && state.guest.catalogDesign){ state.ui.modal='custom'; }
       else if (state.ui.modal==='summary'){ /* summary must be acknowledged */ }
       else if (state.ui.modal==='result'){ finishOrder(); return; }
-      else if (state.ui.modal==='cutting'||state.ui.modal==='assembly'||state.ui.modal==='pricing'){ state.ui.modal=null; }
+      else if (state.ui.modal==='assembly'||state.ui.modal==='pricing'){ state.ui.modal=null; }
       else state.ui.modal=null;
-      renderModal(); break;
+      renderAll(); break;
 
     case 'shop': state.ui.modal='shop'; renderModal(); break;
     case 'shop-color': state.ui.shopColor=(state.ui.shopColor===id?null:id); renderModal(); break;
@@ -3221,7 +3334,7 @@ document.addEventListener('click', function(e){
     case 'ticket': state.ui.modal='ticket'; state.ui.modalId=id; renderModal(); break;
     case 'accept': acceptTicket(id); break;
     case 'decline': declineTicket(id); break;
-    case 'resume': state.ui.modal=state.guest.exclusiveId?'pricing':(isCustom()?'custom':'cutting'); renderModal(); break;
+    case 'resume': state.ui.modal=state.guest.exclusiveId?'pricing':(isCustom()?'custom':null); renderAll(); break;
 
     case 'add-item': startCustomItem(); break;
     case 'pick-custom-fabric': pickCustomFabric(id); break;
@@ -3237,7 +3350,7 @@ document.addEventListener('click', function(e){
       state.ui.modal='trace';
       renderModal(); break;
     case 'toggle-fabric': state.ui.fabricOpen=!state.ui.fabricOpen; renderModal(); break;
-    case 'close-piece': state.ui.modal='cutting'; state.ui.tracePart=null; renderModal(); break;
+    case 'close-piece': state.ui.modal=null; state.ui.tracePart=null; renderAll(); break;
     case 'pick-fabric': selectFabricForPart(part,id); break;
     case 'reset-trace': resetPieceTrace(part); break;
     case 'proceed-cut': proceedFromCutting(); break;
@@ -3309,6 +3422,7 @@ renderAll();
 </script>
 </body>
 </html>
+
 
 
 
