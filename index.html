@@ -492,6 +492,33 @@
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 
+  /* themed text-entry popup */
+  .prompt-veil{
+    position:absolute; inset:0; z-index:95; background:rgba(43,38,32,0.62);
+    display:flex; align-items:center; justify-content:center; padding:22px;
+    padding-top:calc(var(--safe-top) + 22px); padding-bottom:calc(var(--safe-bot) + 22px);
+  }
+  .prompt-card{
+    width:100%; max-width:340px; background:var(--canvas); border:1px solid var(--ink);
+    border-radius:14px; box-shadow:0 10px 30px rgba(43,38,32,0.4); overflow:hidden;
+    animation:prompt-pop 0.16s ease-out;
+  }
+  @keyframes prompt-pop{ from{ transform:translateY(10px) scale(0.98); opacity:0; } to{ transform:none; opacity:1; } }
+  .prompt-head{ padding:13px 15px; background:var(--paper); border-bottom:1px solid var(--ink); position:relative; }
+  .prompt-head::before{ content:""; position:absolute; left:0; right:0; top:0; height:4px;
+    background:repeating-linear-gradient(90deg, var(--thread-green) 0 10px, transparent 10px 16px); }
+  .prompt-head h3{ font-family:var(--display); font-weight:800; font-size:18px; margin:0; }
+  .prompt-head .sub{ font-family:var(--tag); font-size:9.5px; color:#8a8069; text-transform:uppercase; letter-spacing:0.05em; margin-top:2px; }
+  .prompt-body{ padding:14px 15px 16px; }
+  .prompt-label{ font-size:12px; color:#6f6656; line-height:1.35; margin-bottom:9px; }
+  .prompt-input{
+    width:100%; font-family:var(--body); font-size:15px; color:var(--ink); background:#fff;
+    border:1px solid var(--ink); border-radius:8px; padding:11px 12px;
+  }
+  .prompt-input:focus{ outline:none; border-color:var(--thread-green); box-shadow:0 0 0 2px rgba(62,98,89,0.18); }
+  .prompt-actions{ display:flex; gap:8px; margin-top:12px; }
+  .prompt-actions .btn{ margin-top:0; }
+
   ::-webkit-scrollbar{ width:7px; height:7px; }
   ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
 
@@ -721,6 +748,55 @@ function toast(msg){
   t.classList.add('show');
   clearTimeout(toast._h);
   toast._h = setTimeout(function(){ t.classList.remove('show'); }, 2100);
+}
+
+/* A themed text-entry popup that matches the game's paper-and-thread look,
+   used in place of the plain browser prompt. Resolves through opts.onConfirm
+   (trimmed value) or opts.onCancel. */
+function gamePrompt(opts){
+  opts = opts || {};
+  var host = document.getElementById('prompt-root');
+  if (!host){
+    host = document.createElement('div');
+    host.id = 'prompt-root';
+    document.getElementById('game').appendChild(host);
+  }
+  var title = opts.title || 'Name It';
+  var sub   = opts.sub || '';
+  var label = opts.label || '';
+  var def   = opts.value || '';
+  var okTxt = opts.okLabel || 'Save';
+  var maxlen= opts.maxLength || 40;
+
+  host.innerHTML =
+    '<div class="prompt-veil">'+
+      '<div class="prompt-card" role="dialog" aria-modal="true">'+
+        '<div class="prompt-head"><h3>'+esc(title)+'</h3>'+(sub?'<div class="sub">'+esc(sub)+'</div>':'')+'</div>'+
+        '<div class="prompt-body">'+
+          (label?'<div class="prompt-label">'+esc(label)+'</div>':'')+
+          '<input class="prompt-input" id="prompt-input" type="text" maxlength="'+maxlen+'" '+
+            'value="'+esc(def)+'" autocomplete="off" autocapitalize="words" spellcheck="false">'+
+          '<div class="prompt-actions">'+
+            '<button class="btn" id="prompt-cancel">Cancel</button>'+
+            '<button class="btn primary" id="prompt-ok">'+esc(okTxt)+'</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  var input = document.getElementById('prompt-input');
+  function close(){ host.innerHTML = ''; }
+  function confirm(){ var v = input.value.trim(); close(); if (opts.onConfirm) opts.onConfirm(v); }
+  function cancel(){ close(); if (opts.onCancel) opts.onCancel(); }
+
+  document.getElementById('prompt-ok').addEventListener('click', confirm);
+  document.getElementById('prompt-cancel').addEventListener('click', cancel);
+  host.querySelector('.prompt-veil').addEventListener('click', function(e){ if (e.target===this) cancel(); });
+  input.addEventListener('keydown', function(e){
+    if (e.key==='Enter'){ e.preventDefault(); confirm(); }
+    else if (e.key==='Escape'){ e.preventDefault(); cancel(); }
+  });
+  setTimeout(function(){ input.focus(); input.select(); }, 30);
 }
 
 var TILE_CACHE = {};
@@ -1462,9 +1538,20 @@ function addExclusive(){
   var g=state.guest;
   var suggested = (g && g.exclusiveName) ? g.exclusiveName
                : (cg.custom ? 'Signature Piece' : cg.garmentName);
-  var name = window.prompt('Name this exclusive as it will appear in your catalog:', suggested);
-  if (name===null) return;                       /* player cancelled */
-  name = name.trim() || (suggested + ' No.' + (state.exclusives.length+1));
+  gamePrompt({
+    title:'Add to Exclusive Catalog',
+    sub:'Name your signature piece',
+    label:'This is how the piece will appear in your catalog.',
+    value:suggested,
+    okLabel:'Add to Catalog',
+    onConfirm:function(name){
+      name = name || (suggested + ' No.' + (state.exclusives.length+1));
+      finalizeExclusive(cg, g, name);
+    }
+  });
+}
+
+function finalizeExclusive(cg, g, name){
   var ex={
     id:'ex'+(exclusiveSeq++),
     name: name,
@@ -1493,12 +1580,18 @@ function removeExclusive(id){
 
 function renameExclusive(id){
   var ex=exclusiveById(id); if (!ex) return;
-  var name=window.prompt('Rename this exclusive:', ex.name);
-  if (name===null) return;                /* cancelled */
-  name=name.trim(); if (!name) return;
-  ex.name=name;
-  toast('Renamed to '+esc(name)+'.');
-  renderModal();
+  gamePrompt({
+    title:'Rename Exclusive',
+    sub:'Catalog display name',
+    value:ex.name,
+    okLabel:'Save Name',
+    onConfirm:function(name){
+      if (!name) return;
+      ex.name=name;
+      toast('Renamed to '+esc(name)+'.');
+      renderModal();
+    }
+  });
 }
 
 /* Render a saved exclusive by briefly lending its pieces to the shared art code. */
@@ -3216,6 +3309,7 @@ renderAll();
 </script>
 </body>
 </html>
+
 
 
 
