@@ -90,6 +90,7 @@
   }
   .hotspot:hover, .hotspot:active{ border-color:rgba(251,247,238,0.9); background:rgba(251,247,238,0.14); }
   .hotspot .hs-label{
+    position:relative;
     font-family:var(--tag); font-size:10px; color:var(--ink);
     background:rgba(251,247,238,0.92); border:1px solid var(--ink); border-radius:20px;
     padding:3px 10px; margin-bottom:-11px; white-space:nowrap; box-shadow:var(--shadow);
@@ -441,7 +442,7 @@ var SAVE_KEY = 'fashionfrenzy_savegame';
 var SETTINGS_KEY = 'fashionfrenzy_settings';
 
 /* Player-tunable gameplay options, persisted separately from the save. */
-var settings = { patience:false, dayMinutes:5 };
+var settings = { patience:false, precisionMatters:false, dayMinutes:5 };
 
 function loadSettings(){
   try{
@@ -449,6 +450,7 @@ function loadSettings(){
     if (!raw) return;
     var d=JSON.parse(raw);
     if (typeof d.patience==='boolean') settings.patience=d.patience;
+    if (typeof d.precisionMatters==='boolean') settings.precisionMatters=d.precisionMatters;
     if (typeof d.dayMinutes==='number') settings.dayMinutes=clamp(d.dayMinutes,1,60);
   }catch(e){}
 }
@@ -1506,7 +1508,42 @@ function presentToGuest(){
     pf=clamp(1-Math.max(0,(price/fp)-1)*0.6,0,1);
   }
   var sat=q*pf, accepted=(sat+rnd(-6,6))>=55;
+
+  /* Precision Matters (opt-in): cutting accuracy becomes a hard gate on the sale.
+     85%+ always satisfies, under 65% is an automatic no-sale, and the 65-85 band
+     is judged against a random per-customer standard so 72% beats 69% on average
+     but either can pass or fail on the day. */
+  var precAvg=state.cutGarment.precisionAvg, precFail=false, precStandard=null;
+  if (settings.precisionMatters && precAvg!=null){
+    if (precAvg>=85){ precFail=false; }
+    else if (precAvg<65){ precFail=true; }
+    else { precStandard=65+rnd(0,20); precFail=(precAvg<precStandard); }
+    if (precFail) accepted=false;
+  }
+
+  /* Collect every reason the piece missed, for the walk-away explanation. */
+  var reasons=[];
+  if (!accepted){
+    var wantAnyColor=g.wantColors.indexOf('any')!==-1;
+    var colorMiss=0, patternMiss=0;
+    state.cutGarment.parts.forEach(function(p){
+      var f=fabricById(p.fabricId); if (!f) return;
+      if (!wantAnyColor && g.wantColors.indexOf(f.colorId)===-1) colorMiss++;
+      if (g.wantPattern!=='any' && g.wantPattern!==f.patternId) patternMiss++;
+    });
+    if (colorMiss>0)   reasons.push('Color &mdash; the fabric wasn&rsquo;t in the color they asked for.');
+    if (patternMiss>0) reasons.push('Pattern &mdash; the pattern didn&rsquo;t match their request.');
+    if (settings.precisionMatters && precFail){
+      reasons.push('Precision &mdash; the cutting was too imprecise ('+Math.round(precAvg)+'%'+
+        (precStandard!=null?', short of their '+Math.round(precStandard)+'% standard':'')+').');
+    }
+    if (price>g.budget) reasons.push('Price &mdash; '+money(price)+' was over their '+money(g.budget)+' budget.');
+    else if (pf<0.85)   reasons.push('Price &mdash; '+money(price)+' felt steep for the quality.');
+    if (!reasons.length) reasons.push('Their taste was simply particular today.');
+  }
+
   var repDelta=clamp(Math.round((sat-55)/9),-5,5);
+  if (!accepted) repDelta=clamp(repDelta,-5,0);   /* a rejected sale never raises reputation */
   state.reputation=clamp(state.reputation+repDelta,0,100);
 
   if (accepted){
@@ -1524,7 +1561,7 @@ function presentToGuest(){
     });
   }
   state.lastResult={ accepted:accepted, price:price, quality:q, repDelta:repDelta,
-                     garmentName:state.cutGarment.garmentName, guestName:g.name };
+                     garmentName:state.cutGarment.garmentName, guestName:g.name, reasons:reasons };
   state.ui.modal='result';
   renderModal();
 }
@@ -1767,7 +1804,7 @@ function renderScene(){
       '</button>'+
       /* wooden cubby carcass with the folded clothes -> clearance rack */
       '<button class="hotspot" data-act="clearance" style="left:18.5%; top:24.8%; width:57%; height:17.7%;">'+
-        '<span class="hs-label">Clearance Rack</span>'+ rackBadge +
+        '<span class="hs-label">Clearance Rack'+ rackBadge +'</span>'+
       '</button>'+
     '</div>'+
     '<div class="clock-badge">'+
@@ -2462,6 +2499,13 @@ function bodyPricing(){
 
 function bodyResult(){
   var r=state.lastResult;
+  var reasonsHtml='';
+  if (!r.accepted && r.reasons && r.reasons.length){
+    reasonsHtml='<div class="d" style="margin-top:8px;"><b>Why it didn&rsquo;t sell:</b></div>'+
+      '<ul style="margin:5px 0 0; padding-left:18px; text-align:left;">'+
+        r.reasons.map(function(x){ return '<li style="margin:3px 0;">'+x+'</li>'; }).join('')+
+      '</ul>';
+  }
   return garmentArt(state.cutGarment)+
     '<div class="res '+(r.accepted?'ok':'no')+'">'+
       '<div class="h">'+(r.accepted?esc(r.guestName)+' loves it!':esc(r.guestName)+' walks away.')+'</div>'+
@@ -2469,6 +2513,7 @@ function bodyResult(){
         ? 'Sold the '+r.garmentName+' for '+money(r.price)+' at '+Math.round(r.quality)+'% match.'
         : 'The '+r.garmentName+' did not win them over. It is on the clearance rack now.')+'</div>'+
       '<div class="d">Reputation '+(r.repDelta>=0?'+':'')+r.repDelta+'</div>'+
+      reasonsHtml+
     '</div>'+
     '<button class="btn primary" data-act="finish-order">Back to the Shop</button>';
 }
@@ -2494,10 +2539,15 @@ function bodySummary(){
 
 function bodyGameplay(){
   var on=settings.patience;
+  var onPrec=settings.precisionMatters;
   return '<div class="note" style="margin-top:0;">These options are saved on this device and apply to every day from now on.</div>'+
     '<div class="opt-row">'+
       '<div class="opt-txt"><b>Guest patience</b><small>When on, waiting guests eventually give up and leave, costing reputation. Off by default.</small></div>'+
       '<button class="switch'+(on?' on':'')+'" data-act="toggle-patience" aria-pressed="'+(on?'true':'false')+'"><i></i></button>'+
+    '</div>'+
+    '<div class="opt-row">'+
+      '<div class="opt-txt"><b>Precision matters</b><small>When on, sloppy cutting can lose the sale: 85%+ precision always satisfies, under 65% is an automatic no-sale, and anything in between is judged against each customer&rsquo;s own standard. Off by default.</small></div>'+
+      '<button class="switch'+(onPrec?' on':'')+'" data-act="toggle-precision" aria-pressed="'+(onPrec?'true':'false')+'"><i></i></button>'+
     '</div>'+
     '<div class="opt-row col">'+
       '<div class="opt-txt"><b>Day length</b><small>How much real time one workday (10:00 AM to 5:00 PM) takes.</small></div>'+
@@ -2603,6 +2653,11 @@ document.addEventListener('click', function(e){
       settings.patience=!settings.patience; saveSettings();
       renderModal(); renderTray();
       toast('Guest patience '+(settings.patience?'on':'off')+'.');
+      break;
+    case 'toggle-precision':
+      settings.precisionMatters=!settings.precisionMatters; saveSettings();
+      renderModal();
+      toast('Precision matters '+(settings.precisionMatters?'on':'off')+'.');
       break;
     case 'close-modal':
       if (state.ui.modal==='trace'){ state.ui.modal='cutting'; state.ui.tracePart=null; }
