@@ -630,6 +630,75 @@
     padding:0 4px; margin-left:6px; vertical-align:1px;
   }
 
+  /* ---------- ledger ---------- */
+  .hud-btns{ display:flex; gap:7px; flex:0 0 auto; }
+  .iconbtn{
+    width:40px; height:40px; flex:0 0 40px; border:1px solid var(--ink); border-radius:9px;
+    background:var(--canvas); cursor:pointer; padding:0;
+    display:flex; align-items:center; justify-content:center; color:var(--ink);
+  }
+  .iconbtn:active{ transform:translateY(1px); }
+  .iconbtn svg{ display:block; }
+
+  .led-hero{
+    background:var(--paper); border:1px solid var(--ink); border-radius:12px;
+    padding:14px 16px; text-align:center; margin-bottom:12px;
+  }
+  .led-hero .k{
+    font-family:var(--tag); font-size:9.5px; text-transform:uppercase;
+    letter-spacing:0.06em; color:#8a8069;
+  }
+  .led-hero .v{ font-family:var(--display); font-weight:800; font-size:32px; line-height:1.1; margin-top:3px; }
+  .led-hero .v.pos{ color:var(--ink); }
+  .led-hero .v.neg{ color:var(--bad); }
+  .led-hero .sub{ font-family:var(--tag); font-size:10px; color:#8a8069; margin-top:4px; }
+
+  .led-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+  .led-stat{ background:#fff; border:1px solid var(--line); border-radius:9px; padding:9px 10px; }
+  .led-stat .k{
+    font-family:var(--tag); font-size:8.5px; text-transform:uppercase;
+    letter-spacing:0.05em; color:#8a8069;
+  }
+  .led-stat .v{ font-family:var(--display); font-weight:700; font-size:16px; margin-top:2px; }
+
+  .led-h{
+    font-family:var(--tag); font-size:9.5px; text-transform:uppercase; letter-spacing:0.06em;
+    color:#8a8069; margin:0 0 8px; padding-top:2px;
+  }
+  .led-card{
+    background:var(--paper); border:1px solid var(--ink); border-radius:12px;
+    padding:12px 12px 10px; margin-bottom:14px;
+  }
+  .led-chart{ width:100%; height:auto; display:block; touch-action:manipulation; }
+  .led-read{
+    font-family:var(--tag); font-size:10px; color:#6b6252; text-align:center;
+    margin-top:7px; min-height:13px;
+  }
+  .led-read b{ font-family:var(--display); font-size:13px; }
+  .led-read b.pos{ color:var(--ink); }
+  .led-read b.neg{ color:var(--bad); }
+  .led-note{ font-family:var(--tag); font-size:9px; color:#a89d80; text-align:center; margin-top:5px; }
+
+  .rcpt{
+    display:grid; grid-template-columns:44px 1fr auto; gap:9px; align-items:baseline;
+    padding:7px 2px; border-bottom:1px dashed var(--line-soft);
+  }
+  .rcpt:last-child{ border-bottom:none; }
+  .rcpt .t{ font-family:var(--tag); font-size:9px; color:#a89d80; white-space:nowrap; }
+  .rcpt .l{ font-size:12.5px; line-height:1.25; min-width:0; }
+  .rcpt .l small{ display:block; font-family:var(--tag); font-size:9.5px; color:#8a8069; margin-top:1px; }
+  .rcpt .a{ font-family:var(--display); font-weight:700; font-size:14px; white-space:nowrap; }
+  .rcpt .a.in{ color:var(--ink); }
+  .rcpt .a.out{ color:var(--bad); }
+  .rcpt-tot{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-top:9px; padding-top:9px; border-top:1px solid var(--ink);
+    font-family:var(--tag); font-size:10px; text-transform:uppercase; color:#6b6252;
+  }
+  .rcpt-tot b{ font-family:var(--display); font-size:16px; text-transform:none; }
+  .rcpt-tot b.pos{ color:var(--ink); }
+  .rcpt-tot b.neg{ color:var(--bad); }
+
   /* ---------- customer dialogue + accessory sale on the result page ---------- */
   .say{
     font-family:var(--display); font-style:italic; font-size:16.5px; line-height:1.45;
@@ -876,6 +945,12 @@ function freshState(){
     exclusives:[],           /* player-designed signature pieces */
     catalogOff:{},           /* garment ids the shop has switched off */
     upgrades:{ highEndFabrics:false, accessories:0 },   /* permanent, saved with the game */
+    /* Ledger bookkeeping. `lifetime` and `history` persist; `receipts` and
+       `dayLedger` are day-scoped and cleared when the next day begins. */
+    lifetime:{ earned:0, spent:0, sold:0, declined:0, accessories:0, accessoryEarned:0 },
+    history:[],
+    receipts:[],
+    dayLedger:{ inAmt:0, outAmt:0 },
     phase:'closed',           /* closed | open | summary */
     clock:OPEN_MIN,
     tickets:[],
@@ -894,7 +969,7 @@ function freshState(){
     lastResult:null,
     ui:{ modal:null, tracePart:null, modalId:null, fabricOpen:true,
          catalogTab:'std', donateMode:false, donateSel:[], shopColor:null,
-         shopMat:'cotton', repDecimal:false }
+         shopMat:'cotton', repDecimal:false, ledgerDay:null }
   };
 }
 
@@ -1908,6 +1983,7 @@ function buyUpgrade(key){
     if (state.cash < UPGRADE_FABRICS_COST){ toast('Not enough cash for that upgrade.'); return; }
     state.cash -= UPGRADE_FABRICS_COST;
     state.upgrades.highEndFabrics = true;
+    logReceipt('out', 'Upgrade', 'High-End Fabrics', UPGRADE_FABRICS_COST);
     toast('High-End Fabrics unlocked &middot; wool, silk, and cashmere are now stocked.');
     renderAll();
     return;
@@ -1919,6 +1995,7 @@ function buyUpgrade(key){
     if (state.cash < next.cost){ toast('Not enough cash for that upgrade.'); return; }
     state.cash -= next.cost;
     state.upgrades.accessories = t+1;
+    logReceipt('out', 'Upgrade', next.name, next.cost);
     toast(esc(next.name)+' unlocked.');
     renderAll();
   }
@@ -2134,6 +2211,52 @@ function initAssemblyDrag(stage){
   stage.addEventListener('pointerup', end);
   stage.addEventListener('pointercancel', end);
 }
+
+/* ============================= LEDGER =============================
+   Every movement of cash is written into the day's receipts and folded into the
+   lifetime totals. At close of business the day is appended to `history`, which
+   is what the balance chart plots. Receipts are wiped when the next day starts;
+   the history and the lifetime totals are kept and saved. */
+
+var HISTORY_MAX = 120;   /* days of balance history kept in the save */
+var CHART_DAYS = 30;     /* days shown in the balance chart */
+var receiptSeq = 1;
+
+/* dir: 'in' money taken, 'out' money spent. */
+function logReceipt(dir, label, detail, amount){
+  amount = Math.round(amount*100)/100;
+  state.receipts.push({
+    id:'rc'+(receiptSeq++), dir:dir, label:label, detail:detail||'',
+    amount:amount, at:state.clock
+  });
+  /* a single day cannot realistically fill this, but never let it grow unbounded */
+  while (state.receipts.length > 300) state.receipts.shift();
+  if (dir==='out'){
+    state.dayLedger.outAmt += amount;
+    state.lifetime.spent += amount;
+  } else {
+    state.dayLedger.inAmt += amount;
+    state.lifetime.earned += amount;
+  }
+}
+
+/* Close the books on the day and file it in the history. */
+function recordDayInHistory(){
+  var l=state.dayLedger;
+  state.history.push({
+    d:state.day, inAmt:l.inAmt, outAmt:l.outAmt, net:l.inAmt-l.outAmt,
+    cash:state.cash, sold:state.dayStats.sold, rep:state.reputation
+  });
+  while (state.history.length > HISTORY_MAX) state.history.shift();
+}
+
+function clearDayLedger(){
+  state.receipts=[];
+  state.dayLedger={ inAmt:0, outAmt:0 };
+  state.ui.ledgerDay=null;
+}
+
+function lifetimeNet(){ return state.lifetime.earned - state.lifetime.spent; }
 
 /* ============================= CUSTOMER DIALOGUE =============================
    What the guest actually says on the result screen. Words wrapped in [[ ]] are
@@ -2429,8 +2552,11 @@ function presentToGuest(){
   if (accepted){
     state.cash+=price; state.totalSales+=price; state.guestsServed++;
     state.dayStats.sold++; state.dayStats.earned+=price;
+    state.lifetime.sold++;
+    logReceipt('in', 'Garment sold', esc(g.name)+' &middot; '+esc(state.cutGarment.garmentName), price);
   } else {
     state.dayStats.declined++;
+    state.lifetime.declined++;
     state.rack.push({
       id:'r'+(rackSeq++),
       garmentId:state.cutGarment.garmentId,
@@ -2448,6 +2574,9 @@ function presentToGuest(){
     state.dayStats.earned+=acc.amount;
     state.dayStats.accessories=(state.dayStats.accessories||0)+1;
     state.dayStats.accessoryEarned=(state.dayStats.accessoryEarned||0)+acc.amount;
+    state.lifetime.accessories++;
+    state.lifetime.accessoryEarned+=acc.amount;
+    logReceipt('in', 'Accessories', esc(g.name)+' &middot; '+esc(acc.tier), acc.amount);
   }
 
   state.lastResult={ accepted:accepted, price:price, quality:q, repDelta:repDelta,
@@ -2473,7 +2602,8 @@ function sellRackItem(rid){
   state.rack=state.rack.filter(function(r){ if(r.id===rid){ it=r; return false; } return true; });
   if (!it) return;
   state.cash+=it.value; state.totalSales+=it.value;
-  toast('Sold ' + it.garmentName + ' for ' + money(it.value) + '.');
+  logReceipt('in', 'Clearance', esc(it.garmentName), it.value);
+  toast('Sold ' + esc(it.garmentName) + ' for ' + money(it.value) + '.');
   renderAll();
 }
 
@@ -2494,7 +2624,9 @@ function recycleRackItem(rid){
 function sellAllRack(){
   if (!state.rack.length) return;
   var sum=state.rack.reduce(function(s,r){ return s+r.value; },0);
+  var n=state.rack.length;
   state.cash+=sum; state.totalSales+=sum; state.rack=[];
+  logReceipt('in', 'Clearance', n+' piece'+(n===1?'':'s')+' &middot; rack cleared', sum);
   toast('Rack cleared for ' + money(sum) + '.');
   renderAll();
 }
@@ -2504,6 +2636,7 @@ function buyFabric(fid, yards){
   if (state.cash<cost){ toast('Not enough cash.'); return; }
   state.cash-=cost;
   state.stock[fid]=(state.stock[fid]||0)+yards;
+  logReceipt('out', 'Fabric', yards+' yd &middot; '+fabricFullName(f), cost);
   toast('Ordered ' + yards + ' yd of ' + esc(fabricFullName(f)) + '.');
   renderAll();
 }
@@ -2535,7 +2668,7 @@ function clockPaused(){
   /* meta screens pause the day; crafting does not, so the workday stays meaningful */
   var m=state.ui.modal;
   return m==='menu' || m==='summary' || m==='result' ||
-         m==='gameplay' || m==='upgrades' || m==='howto';
+         m==='gameplay' || m==='upgrades' || m==='howto' || m==='ledger';
 }
 
 function tick(){
@@ -2580,6 +2713,7 @@ function tick(){
 
 function endDay(){
   stopClock();
+  recordDayInHistory();
   state.phase='summary';
   state.closingPending=false;
   state.tickets=[];
@@ -2591,6 +2725,8 @@ function nextDay(){
   state.day++;
   state.phase='closed';
   state.clock=OPEN_MIN;
+  /* a new day starts with a clean set of receipts */
+  clearDayLedger();
   state.ui.modal=null;
   renderAll();
 }
@@ -2599,7 +2735,7 @@ function nextDay(){
 
 function saveGame(){
   var data={
-    v:3, day:state.day, cash:state.cash, reputation:state.reputation,
+    v:4, day:state.day, cash:state.cash, reputation:state.reputation,
     guestsServed:state.guestsServed, totalSales:state.totalSales,
     stock:state.stock, rack:state.rack, rackSeq:rackSeq,
     exclusives:state.exclusives, catalogOff:state.catalogOff, exclusiveSeq:exclusiveSeq,
@@ -2607,7 +2743,12 @@ function saveGame(){
     upgrades:{
       highEndFabrics: !!state.upgrades.highEndFabrics,
       accessories: accessoryTier()
-    }
+    },
+    /* ledger: lifetime totals and the per-day balance history. The day's
+       receipts are deliberately not saved -- a load always lands at the start
+       of a day, where the books for that day are empty by definition. */
+    lifetime: state.lifetime,
+    history: state.history
   };
   try{
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -2657,6 +2798,17 @@ function loadGame(auto){
     state.upgrades.accessories = clamp(isFinite(at)?at:0, 0, ACCESSORY_TIERS.length);
   }
   if (!state.upgrades.highEndFabrics) state.ui.shopMat='cotton';
+  /* Ledger. Saves written before v4 simply have no books yet. */
+  if (d.lifetime && typeof d.lifetime==='object'){
+    ['earned','spent','sold','declined','accessories','accessoryEarned'].forEach(function(k){
+      var n=Number(d.lifetime[k]);
+      state.lifetime[k] = isFinite(n) ? n : 0;
+    });
+  }
+  state.history = Array.isArray(d.history) ? d.history.filter(function(h){
+    return h && typeof h.d==='number' && typeof h.net==='number';
+  }).slice(-HISTORY_MAX) : [];
+  clearDayLedger();
   state.phase='closed';
   state.ui.modal=null;
   toast((auto?'Resumed &mdash; Day ':'Game loaded &mdash; Day ') + state.day + '.');
@@ -2687,7 +2839,18 @@ function renderHUD(){
   document.getElementById('hud').innerHTML =
     '<div class="hud-top">'+
       '<div class="hud-title">Fashion Frenzy<span>Atelier &amp; Cutting Table</span></div>'+
-      '<button class="hamburger" data-act="menu" aria-label="Menu"><i></i><i></i><i></i></button>'+
+      '<div class="hud-btns">'+
+        '<button class="iconbtn" data-act="ledger" aria-label="Ledger" title="Ledger">'+
+          '<svg viewBox="0 0 20 20" width="19" height="19" aria-hidden="true">'+
+            '<g fill="currentColor">'+
+              '<circle cx="3" cy="4.5" r="1.5"/><rect x="7" y="3.5" width="11" height="2" rx="1"/>'+
+              '<circle cx="3" cy="10" r="1.5"/><rect x="7" y="9" width="11" height="2" rx="1"/>'+
+              '<circle cx="3" cy="15.5" r="1.5"/><rect x="7" y="14.5" width="11" height="2" rx="1"/>'+
+            '</g>'+
+          '</svg>'+
+        '</button>'+
+        '<button class="hamburger" data-act="menu" aria-label="Menu"><i></i><i></i><i></i></button>'+
+      '</div>'+
     '</div>'+
     '<div class="hud-stats">'+
       '<div class="stat cash"><div class="k">Cash</div><div class="v">'+money(state.cash)+'</div></div>'+
@@ -3809,6 +3972,175 @@ function bodyGameplay(){
     '<button class="btn primary" data-act="menu">Back to Menu</button>';
 }
 
+/* ---------- Ledger ----------
+   Three things, in the order a shopkeeper wants them: where the business stands
+   overall, how each day has gone, and what changed hands today.
+
+   The chart plots one signed value per day, so its job is polarity over time:
+   bars on a zero baseline, ink for a day in the black and red for a day in the
+   red. That pairing is deliberate. The obvious choice -- the shop's own green
+   against its red -- separates by only dE 3.5 under protanopia, i.e. not at all
+   for a red-green colourblind player, whereas ink against red separates by 18.
+   Sign is carried by position across the baseline as well as by hue, so the
+   chart never depends on colour alone. */
+
+function ledgerStat(k, v){
+  return '<div class="led-stat"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+}
+
+/* A bar with its two data-end corners rounded, anchored flat to the baseline. */
+function barPath(x, y, w, h, r){
+  r = Math.max(0, Math.min(r, w/2, Math.abs(h)));
+  if (h >= 0){    /* grows upward from the baseline at y */
+    var t = y - h;
+    return 'M'+x+' '+y+' L'+x+' '+(t+r)+' Q'+x+' '+t+' '+(x+r)+' '+t+
+           ' L'+(x+w-r)+' '+t+' Q'+(x+w)+' '+t+' '+(x+w)+' '+(t+r)+' L'+(x+w)+' '+y+' Z';
+  }
+  var b = y - h;   /* h negative: grows downward */
+  return 'M'+x+' '+y+' L'+x+' '+(b-r)+' Q'+x+' '+b+' '+(x+r)+' '+b+
+         ' L'+(x+w-r)+' '+b+' Q'+(x+w)+' '+b+' '+(x+w)+' '+(b-r)+' L'+(x+w)+' '+y+' Z';
+}
+
+function balanceChart(){
+  var all = state.history;
+  if (!all.length){
+    return '<div class="empty">No trading days closed yet. Finish a day and its '+
+           'balance will be plotted here.</div>';
+  }
+  var rows = all.slice(-CHART_DAYS);
+  var W = 320, H = 132, PADL = 6, PADR = 6, PADT = 14, PADB = 16;
+  var plotW = W-PADL-PADR, plotH = H-PADT-PADB;
+
+  var nets = rows.map(function(r){ return r.net; });
+  var top = Math.max(0, Math.max.apply(null, nets));
+  var bot = Math.min(0, Math.min.apply(null, nets));
+  var range = (top-bot) || 1;
+  var zeroY = PADT + plotH*(top/range);
+
+  var gap = rows.length>1 ? 2 : 0;
+  var bw = Math.max(1.5, (plotW - gap*(rows.length-1))/rows.length);
+
+  /* label only the best and the worst day, never every bar */
+  var best=0, worst=0;
+  rows.forEach(function(r,i){ if (r.net>rows[best].net) best=i; if (r.net<rows[worst].net) worst=i; });
+
+  var sel = state.ui.ledgerDay;
+  var bars = rows.map(function(r,i){
+    var x = PADL + i*(bw+gap);
+    var h = (r.net/range)*plotH;
+    var isSel = sel===r.d;
+    var fill = r.net<0 ? 'var(--bad)' : 'var(--ink)';
+    return '<path d="'+barPath(x, zeroY, bw, h, Math.min(4, bw/2))+'" fill="'+fill+'"'+
+      (isSel?' stroke="var(--brass)" stroke-width="1.5"':'')+'/>'+
+      /* a generous invisible hit target, so small bars stay tappable */
+      '<rect x="'+(x-gap/2)+'" y="'+PADT+'" width="'+(bw+gap)+'" height="'+plotH+'" fill="transparent" '+
+        'data-act="ledger-day" data-id="'+r.d+'" style="cursor:pointer">'+
+        '<title>Day '+r.d+': '+(r.net<0?'-':'+')+money(Math.abs(r.net))+'</title></rect>';
+  }).join('');
+
+  function tag(i, anchor){
+    var r=rows[i], x=PADL+i*(bw+gap)+bw/2;
+    var h=(r.net/range)*plotH;
+    var y = r.net>=0 ? zeroY-h-4 : zeroY-h+10;
+    return '<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" text-anchor="'+anchor+'" '+
+      'font-family="Special Elite, monospace" font-size="8" fill="#6b6252">'+
+      (r.net<0?'-':'+')+money(Math.abs(r.net))+'</text>';
+  }
+  var labels = tag(best, best===0?'start':(best===rows.length-1?'end':'middle'));
+  if (worst!==best && rows[worst].net<0){
+    labels += tag(worst, worst===0?'start':(worst===rows.length-1?'end':'middle'));
+  }
+
+  var firstDay=rows[0].d, lastDay=rows[rows.length-1].d;
+  var axis =
+    '<line x1="'+PADL+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-PADR)+'" y2="'+zeroY.toFixed(1)+'" '+
+      'stroke="var(--ink)" stroke-width="1"/>'+
+    '<text x="'+PADL+'" y="'+(H-4)+'" font-family="Special Elite, monospace" font-size="8" '+
+      'fill="#a89d80">Day '+firstDay+'</text>'+
+    (lastDay!==firstDay
+      ? '<text x="'+(W-PADR)+'" y="'+(H-4)+'" text-anchor="end" '+
+        'font-family="Special Elite, monospace" font-size="8" fill="#a89d80">Day '+lastDay+'</text>'
+      : '');
+
+  var readout;
+  var picked = sel!=null ? rows.filter(function(r){ return r.d===sel; })[0] : null;
+  if (picked){
+    readout = 'Day '+picked.d+' &middot; took '+money(picked.inAmt)+', spent '+money(picked.outAmt)+
+      ' &middot; <b class="'+(picked.net<0?'neg':'pos')+'">'+
+      (picked.net<0?'-':'+')+money(Math.abs(picked.net))+'</b>';
+  } else {
+    readout = 'Tap a bar to read that day off the books.';
+  }
+
+  var note = all.length>rows.length
+    ? '<div class="led-note">Showing the last '+rows.length+' of '+all.length+' days on the books.</div>'
+    : '';
+
+  return '<svg class="led-chart" viewBox="0 0 '+W+' '+H+'" role="img" '+
+      'aria-label="Balance per day for the last '+rows.length+' trading days. '+
+      'Bars above the line are days in profit, bars below are days at a loss.">'+
+      axis + bars + labels +
+    '</svg>'+
+    '<div class="led-read">'+readout+'</div>'+ note;
+}
+
+function receiptsBody(){
+  var rs = state.receipts;
+  if (!rs.length){
+    return '<div class="empty">Nothing has changed hands today yet.</div>';
+  }
+  var rows = rs.slice().reverse().map(function(r){
+    return '<div class="rcpt">'+
+      '<span class="t">'+fmtClock(r.at)+'</span>'+
+      '<span class="l">'+r.label+(r.detail?'<small>'+r.detail+'</small>':'')+'</span>'+
+      '<span class="a '+r.dir+'">'+(r.dir==='out'?'-':'+')+money(r.amount)+'</span>'+
+    '</div>';
+  }).join('');
+  var l=state.dayLedger, net=l.inAmt-l.outAmt;
+  return rows+
+    '<div class="rcpt-tot"><span>Today &middot; in '+money(l.inAmt)+' &middot; out '+money(l.outAmt)+'</span>'+
+      '<b class="'+(net<0?'neg':'pos')+'">'+(net<0?'-':'+')+money(Math.abs(net))+'</b></div>';
+}
+
+function bodyLedger(){
+  var lt=state.lifetime, net=lifetimeNet();
+  var best=null, worst=null;
+  state.history.forEach(function(h){
+    if (!best || h.net>best.net) best=h;
+    if (!worst || h.net<worst.net) worst=h;
+  });
+
+  var hero='<div class="led-hero">'+
+      '<div class="k">Net Position</div>'+
+      '<div class="v '+(net<0?'neg':'pos')+'">'+(net<0?'-':'')+money(Math.abs(net))+'</div>'+
+      '<div class="sub">'+money(lt.earned)+' taken &middot; '+money(lt.spent)+' spent'+
+        ' &middot; across '+state.day+' day'+(state.day===1?'':'s')+'</div>'+
+    '</div>';
+
+  var stats='<div class="led-grid">'+
+      ledgerStat('Cash on hand', money(state.cash))+
+      ledgerStat('Reputation', (state.reputation/20).toFixed(2)+' stars')+
+      ledgerStat('Garments sold', lt.sold)+
+      ledgerStat('Turned down', lt.declined)+
+      ledgerStat('Guests served', state.guestsServed)+
+      ledgerStat('Gross takings', money(state.totalSales))+
+      (accessoryTier()
+        ? ledgerStat('Accessory sales', lt.accessories+' &middot; '+money(lt.accessoryEarned))
+        : ledgerStat('Bolts in stock', Object.keys(state.stock).filter(function(k){
+            return state.stock[k]>0; }).length))+
+      ledgerStat('Exclusives', state.exclusives.length)+
+      (best ? ledgerStat('Best day', 'Day '+best.d+' &middot; '+money(best.net)) : '')+
+      (worst && worst.net<0 ? ledgerStat('Worst day', 'Day '+worst.d+' &middot; -'+money(Math.abs(worst.net))) : '')+
+    '</div>';
+
+  return hero+
+    '<div class="led-h">All-Time Standing</div>'+ stats +
+    '<div class="led-h">Balance Per Day</div>'+
+    '<div class="led-card">'+ balanceChart() +'</div>'+
+    '<div class="led-h">Today&rsquo;s Receipts</div>'+
+    '<div class="led-card">'+ receiptsBody() +'</div>';
+}
+
 function bodyMenu(){
   return '<button class="menu-item" data-act="gameplay">Gameplay<small>Guest patience and day length</small></button>'+
     '<button class="menu-item" data-act="save">Save Game<small>Stores progress in this browser</small></button>'+
@@ -3827,6 +4159,11 @@ function bodyHowTo(){
       '<b>Custom orders</b><br>'+
       'Some guests place a custom order instead &mdash; they name only their colors and a budget, and you design the outfit: '+
       'add as many pieces as you like, cut any shapes, then arrange and layer them however you want.<br><br>'+
+      '<b>The ledger</b><br>'+
+      'The list button beside the menu opens your books: how the shop stands all time, a chart of '+
+      'each day&rsquo;s balance (tap a bar to read that day off), and a receipt for every bit of cash '+
+      'that changed hands today. Receipts clear when the next day begins; the chart keeps the '+
+      'running history.<br><br>'+
       '<b>Around the room</b><br>'+
       'Tap the thread spools to order fabric, the lower cubby to work the clearance rack, the pinned cards on the right wall for '+
       'your catalog, and the <b>pegboard above the table</b> to buy shop upgrades.<br><br>'+
@@ -3865,6 +4202,7 @@ function renderModal(){
   else if (m==='menu') html=modalShell('Menu','', bodyMenu());
   else if (m==='gameplay') html=modalShell('Gameplay','Options', bodyGameplay());
   else if (m==='upgrades') html=modalShell('Upgrades','Cash '+money(state.cash), bodyUpgrades());
+  else if (m==='ledger') html=modalShell('Ledger','Day '+state.day+' &middot; the books', bodyLedger(), true);
   else if (m==='howto') html=modalShell('How To Play','Fashion Frenzy', bodyHowTo());
 
   root.innerHTML=html;
@@ -3904,7 +4242,7 @@ document.addEventListener('click', function(e){
     /* tapping the dimmed area closes only light-weight modals */
     var m=state.ui.modal;
     if (m==='shop'||m==='clearance'||m==='ticket'||m==='menu'||m==='gameplay'||
-        m==='upgrades'||m==='howto'){ state.ui.modal=null; renderAll(); }
+        m==='upgrades'||m==='howto'||m==='ledger'){ state.ui.modal=null; renderAll(); }
     return;
   }
   var el=e.target.closest('[data-act]');
@@ -3956,6 +4294,11 @@ document.addEventListener('click', function(e){
       renderAll(); break;
 
     case 'howto': state.ui.modal='howto'; renderModal(); break;
+    case 'ledger': state.ui.modal='ledger'; state.ui.ledgerDay=null; renderModal(); break;
+    case 'ledger-day':
+      var pickDay=parseInt(id,10);
+      state.ui.ledgerDay = (state.ui.ledgerDay===pickDay ? null : pickDay);
+      renderModal(); break;
     case 'upgrades': state.ui.modal='upgrades'; renderModal(); break;
     case 'buy-upgrade': buyUpgrade(id); break;
 
