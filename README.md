@@ -49,10 +49,12 @@ FashionFrenzy/
   index.html               the entire game: HTML, CSS, JS, and the base64 scene art
   manifest.webmanifest     PWA metadata (name, colors, portrait orientation, icons)
   favicon.png              app icon / favicon / apple-touch-icon (1254 x 1254)
+  README.md                this file
   assets/
     fashionfrenzy.png      copy of the icon art
     fashionfrenzy_scene.png  full-resolution atelier scene (source for the embedded JPEG)
   .git/                    version control
+  .DS_Store                macOS folder metadata (see issue 32)
 ```
 
 ### Inside `index.html`
@@ -61,9 +63,11 @@ The file is one document with three regions:
 
 | Region | Approx. lines | Contents |
 | --- | --- | --- |
-| `<head>` + `<style>` | 1&ndash;~640 | Meta tags, PWA hooks, Google Fonts link, and the complete stylesheet as CSS custom properties plus component classes |
-| `<body>` | ~642&ndash;650 | Five empty mount points: `#hud`, `#scene`, `#tray`, `#modal-root`, `#toast` |
-| `<script>` | ~651&ndash;3700 | One IIFE in strict mode containing all game code |
+| `<head>` + `<style>` | 1&ndash;653 | Meta tags, PWA hooks, Google Fonts link, and the complete stylesheet as CSS custom properties plus component classes |
+| `<body>` | 655&ndash;663 | Five empty mount points: `#hud`, `#scene`, `#tray`, `#modal-root`, `#toast` |
+| `<script>` | 664&ndash;4074 | One IIFE in strict mode containing all game code |
+
+4,086 lines in total, of which line 669 alone is the 182&nbsp;KB base64 scene image.
 
 The script is organised into labelled sections, in order:
 
@@ -98,14 +102,16 @@ Each in-game day runs from **10:00&nbsp;AM (`OPEN_MIN` = 600)** to **5:00&nbsp;P
 setting (1&ndash;60 minutes, default 10). A `setInterval` fires every 200&nbsp;ms and advances the
 clock by the elapsed wall-clock delta scaled through `minPerMs()`.
 
-1. **Closed.** A veil over the scene offers *Open the Shop* or *Order Fabric First*.
+1. **Closed.** A veil over the scene offers *Open the Shop*, *Order Fabric First*, or
+   *Shop Upgrades* (the veil covers the scene hotspots, so the pegboard needs its own way in).
 2. **Open.** Guests arrive on a timer. At most **3** orders (`MAX_ORDERS`) can be in play at once,
    counting the one being worked. New arrivals stop 40 minutes before close.
 3. **Summary.** At closing time the day ends (or waits for the current order to finish) and a
    summary sheet reports sales, earnings, refusals, walkouts, reputation change, and cash.
 
-Meta screens (menu, summary, result) pause the clock. Crafting does not &mdash; the workday stays
-under pressure while you cut.
+Meta screens pause the clock &mdash; menu, gameplay settings, upgrades, how-to-play, the day
+summary, and the sale result. Crafting does not, and neither do the fabric shop, clearance rack, or
+catalog: the workday stays under pressure while you cut and while you shop.
 
 ### Guest arrival cadence
 
@@ -117,6 +123,41 @@ Two modes, chosen in Gameplay settings:
 - **Reputation traffic OFF.** A steady 3 guests per in-game hour regardless of reputation.
 
 Either way, reputation scales what guests will pay via `repF = 1 + (reputation - 50) / 220`.
+
+### Budgets
+
+A guest's budget starts from the garment's size (`yards &times; 6.5`), multiplied by a
+`1.5`&ndash;`2.6` taste roll and by `repF`. Two things can lift it above that:
+
+- **Wealthy clientele.** Once High-End Fabrics is unlocked, `wealthRoll()` gives roughly 42% of
+  arrivals a `2.4`&times;&ndash;`5.2`&times; multiplier.
+- **Patrons.** Independently, and whether or not any upgrade is owned, **8%** of guests are a
+  patron. Rather than a flat band, `patronBudget()` sizes their purse to the garment they actually
+  came in for: `topFairPrice()` computes what the finest possible version would fairly fetch
+  &mdash; every piece cut from the dearest bolt in the shop ($64/yd made up) and finished
+  flawlessly &mdash; then adds `PATRON_MARGIN` (20%) on top as the shop's margin, with a
+  &plusmn;15% spread between patrons. A $200 floor covers the smallest pieces, and an existing
+  higher budget is never lowered.
+
+That makes a patron's purse scale with the ask:
+
+| Garment | Yards | Dearest version fairly fetches | Typical patron purse |
+| --- | --- | --- | --- |
+| Lingerie | 1 | $141 | $200 (floor) |
+| T-Shirt / Pants | 2 | $282 | ~$341 |
+| Coat / Dress / Outfit | 3 | $422 | ~$508 |
+| **Ballgown** | 6 | **$845** | **~$1,003** |
+
+A custom brief or an exclusive has no fixed pattern pieces, so it is valued generically at
+`PATRON_BRIEF_YARDS` (4 yards) of good work.
+
+The purse cannot be captured with cheap cloth. A purple polka-dot ballgown in cotton fairly
+fetches $132, so asking a patron's $1,000 for it drives the price factor to zero and the sale
+fails outright. The same gown in cashmere fetches $845 fairly, sells comfortably at $1,000, and
+nets **$748 on $252 of cloth**. Patron tickets are flagged in the order detail so the player knows
+to reach for the good bolts.
+
+Ordinary budgets stay modest: the median guest is still around $35.
 
 ### Three kinds of order
 
@@ -167,6 +208,12 @@ meaning and saves written before the upgrade existed still load correctly.
 
 Fabric is bought in 2-yard increments from the shop, filtered by material and then grouped
 color-first.
+
+In the cutting menu, each premium swatch is stamped with its material's initial so the cloth is
+identifiable at a glance without opening a tooltip: **W** wool, **S** silk, **C** cashmere. Cotton
+swatches are left bare. The letter is drawn in paper cream with an ink outline (`paint-order:
+stroke fill`), so it stays legible on ivory and charcoal alike, and is `pointer-events: none` so it
+never intercepts a tap.
 
 ### Cutting &mdash; the core minigame
 
@@ -243,6 +290,22 @@ Any finished piece can be named and filed in the **Exclusive catalog**, either f
 screen or by starting a standalone design session from the Catalog. Once a piece is in the catalog,
 guests start asking for it by name and will pay `value &times; random(1.1, 1.6) &times; repF`.
 
+### The menu
+
+The hamburger in the HUD opens a five-button list, in order:
+
+| Button | What it does |
+| --- | --- |
+| Gameplay | The five player settings below |
+| Save Game | Writes the save (disabled-looking but always available) |
+| Load Game | Restores the save by hand; disabled when none exists |
+| New Game | Starts over from Day 1 |
+| How To Play | The full guide, on its own screen |
+
+*How To Play* is a dedicated screen (`bodyHowTo()`), not a wall of text stapled to the bottom of the
+menu, and it covers the day loop, custom orders, what each scene hotspot does, both upgrades, and
+where the settings live.
+
 ### Player settings
 
 | Setting | Default | Effect |
@@ -268,8 +331,10 @@ A single purchase. Unlocks the wool, silk, and cashmere versions of every bolt t
 (see [Fabric](#fabric) above), adds a material filter to the fabric shop, and starts bringing
 wealthier guests through the door: `wealthRoll()` gives roughly 42% of arrivals a budget
 multiplier of 2.4&times; to 5.2&times;, and those tickets are flagged as a discerning client so the
-player knows luxury cloth will pay for itself. Once bought, the button is grayed out and reads
-**Purchased**.
+player knows luxury cloth will pay for itself. On top of that, a rare 8% of guests are patrons
+whose purse is sized to the finest possible version of what they asked for &mdash; up to roughly
+$1,000 for a ballgown (see [Budgets](#budgets)). Those are the customers a cashmere piece is
+actually cut for. Once bought, the button is grayed out and reads **Purchased**.
 
 ### Accessories &mdash; $500, then $1000, then $2000
 
@@ -311,7 +376,8 @@ transient per-order and UI state:
   customItems, customDraft, customArrange,
   cutting,        // { partId: cutting state }
   assembly, cutGarment, price, lastResult,
-  ui              // { modal, tracePart, modalId, fabricOpen, catalogTab, ... }
+  ui              // { modal, tracePart, modalId, fabricOpen, catalogTab,
+                  //   donateMode, donateSel, shopColor, shopMat, repDecimal }
 }
 ```
 
@@ -340,6 +406,8 @@ Three module-level counters live outside it: `ticketSeq`, `rackSeq`, `exclusiveS
 | --- | --- |
 | `generateGuest()` / `generateCustomGuest()` / `generateExclusiveGuest()` | Build the three ticket types |
 | `wealthRoll()` | Budget multiplier for the affluent clientele High-End Fabrics attracts |
+| `patronBudget(budget, garment)` | The rare 8% roll that lifts a guest into patron territory |
+| `topFairPrice(garment)` | What the finest possible version of a garment would fairly fetch |
 | `spawnTicket()` | Picks which type to spawn, respecting `MAX_ORDERS` and switched-off offerings |
 | `partMatchQuality(fabricId)` | 0&ndash;100 color+pattern match score for one piece |
 | `currentOverallQuality()` | Weighted running quality across all pieces of the current order |
@@ -369,6 +437,7 @@ Three module-level counters live outside it: `ticketSeq`, `rackSeq`, `exclusiveS
 | `materialById` / `unlockedMaterials` | Material lookup and what the shop currently stocks |
 | `fabricLabel` / `fabricFullName` | Display names; premium bolts name their material |
 | `fabricValuePerYard(f)` | Made-up worth per yard, as opposed to counter price |
+| `materialMark(f)` | The W / S / C initial stamped over a premium swatch in the cutting menu |
 | `pickerFabrics()` | Cutting-table picker: all cotton, plus premium cloth actually in stock |
 | `accessoryTier()` / `accessoryRange()` | Current accessory step and its payout band |
 | `rollAccessorySale()` | The independent 30% roll and its integer payout |
@@ -399,7 +468,7 @@ run untethered), `addExclusive` / `finalizeExclusive`, `removeExclusive`, `renam
 | `renderHUD` / `renderScene` / `renderTray` / `renderModal` / `renderAll` | Full re-render of each mount point |
 | `fitScene` | Keeps the aspect-locked scene stage and on-table work panel pinned to the artwork at any viewport size |
 | `modalShell(title, sub, body, full, cls)` | Shared modal chrome |
-| `body*()` | One builder per screen: `bodyShop`, `bodyClearance`, `bodyCatalog`, `bodyTicketDetail`, `bodyCutting`, `bodyTrace`, `bodyCustom`, `bodyCustomCut`, `bodyCustomAssembly`, `bodyAssembly`, `bodyPricing`, `bodyResult`, `bodySummary`, `bodyGameplay`, `bodyMenu` |
+| `body*()` | One builder per screen, seventeen in all: `bodyShop`, `bodyClearance`, `bodyCatalog`, `bodyTicketDetail`, `bodyCutting`, `bodyTrace`, `bodyCustom`, `bodyCustomCut`, `bodyCustomAssembly`, `bodyAssembly`, `bodyPricing`, `bodyResult`, `bodySummary`, `bodyGameplay`, `bodyMenu`, `bodyUpgrades`, `bodyHowTo` |
 
 **Order flow and day cycle**
 
@@ -430,8 +499,22 @@ throwing.
 
 ### 1. `fashionfrenzy_savegame`
 
-Written by `saveGame()`, read by `loadGame()`, existence-checked by `hasSave()`. Saving is
+Written by `saveGame()`, read by `loadGame(auto)`, existence-checked by `hasSave()`. Saving is
 **manual only** &mdash; via *Menu &rarr; Save Game* or the *Save Game* button on the day summary.
+
+**Loading is automatic.** On startup the game checks for a save and resumes it without the player
+touching the menu, confirming with a *Resumed &mdash; Day N* toast:
+
+```js
+loadSettings();
+if (!hasSave() || !loadGame(true)) renderAll();
+```
+
+`loadGame()` returns `true` only when a save was actually applied, so a first visit, blocked
+storage, or an unreadable save all fall through to a clean Day 1 with the UI fully rendered rather
+than a blank screen. A corrupt save says so (*Save file is unreadable &mdash; starting a new
+game*); a first visit stays quiet. *Menu &rarr; Load Game* still works for reloading the save by
+hand mid-session.
 
 | Field | Type | What is stored |
 | --- | --- | --- |
@@ -510,7 +593,10 @@ Ordered roughly by impact.
 5. **Nothing ever calls `removeItem`.** *New Game* resets memory but leaves the old save on disk,
    so `hasSave()` still reports `true` and *Load Game* stays enabled &mdash; a player who starts over
    and then taps Load silently resurrects the abandoned run. There is also no way to clear a save
-   from inside the game.
+   from inside the game. **Now that startup autoloads**, this bites harder: start a New Game,
+   play without saving, refresh, and the *old* save comes back instead of the run in progress.
+   The fix is not to delete the save silently &mdash; it is to autosave the new run (see item 1),
+   or to offer an explicit *Delete Save* in the menu.
 
 6. **Exclusives are stored uncompressed and unbounded.** Each catalog entry keeps a full
    `cutGarment` plus `customItems` plus `customArrange`, and every cut piece carries up to 56
@@ -526,10 +612,10 @@ Ordered roughly by impact.
    pure profit with zero material cost &mdash; the strongest money exploit in the game. Deduct the
    piece's yardage (and refuse the order when stock is short).
 
-8. **Standard garments have no labor value.** `baseValue()` is `cost + (labor || 0)`, and `labor`
+8. **Standard garments have no labor value.** `baseValue()` is `value + (labor || 0)`, and `labor`
    is only ever set by `buildCustomGarment()`. A hand-cut ballgown is therefore priced purely off
-   its fabric cost, while a two-scrap custom design earns $30 of labor. Give standard garments a
-   labor term scaled by piece count and yardage.
+   the cloth that went into it, while a two-scrap custom design earns $30 of labor on top. Give
+   standard garments a labor term scaled by piece count and yardage.
 
 9. **The reputation-traffic ceiling is unreachable.** `guestsPerDayTarget()` ramps to 70 guests per
    day at five stars, but `MAX_ORDERS` is 3 and only one order can be worked at a time. Past a
@@ -670,10 +756,10 @@ Ordered roughly by impact.
 
 ### Maintainability
 
-38. **3,545 lines in one file, of which one line is 182&nbsp;KB.** The single-file constraint is a
+38. **4,086 lines in one file, of which one line is 182&nbsp;KB.** The single-file constraint is a
     real virtue for a game meant to be dropped on a phone and played offline, so this is not a
     call to add a bundler. But moving the scene image to `assets/` alone would take the file from
-    344&nbsp;KB to about 162&nbsp;KB and make diffs readable again.
+    370&nbsp;KB to about 183&nbsp;KB and make diffs readable again.
 
 39. **No tests and no error boundary.** An exception thrown inside a `render*` function leaves the
     UI half-drawn with no recovery path. Wrapping `renderAll()` in a `try/catch` that surfaces a
@@ -681,7 +767,8 @@ Ordered roughly by impact.
     `fairPrice`, `presentToGuest`), would catch the balance regressions that are easiest to
     introduce.
 
-40. **`clockPaused()` is inconsistent about what counts as a meta screen.** The menu, summary, and
-    result screens pause the clock; the fabric shop, clearance rack, and catalog do not. Browsing
-    the shop mid-day burning in-game time may well be intentional, but it is not documented
-    anywhere in the UI and reads as a bug the first time a day ends while you are picking fabric.
+40. **`clockPaused()` is inconsistent about what counts as a meta screen.** The menu, gameplay
+    settings, upgrades, how-to-play, summary, and result screens pause the clock; the fabric shop,
+    clearance rack, and catalog do not. Burning in-game time while browsing the shop may well be
+    intentional, but the split is not documented anywhere in the UI and reads as a bug the first
+    time a day ends while you are picking fabric.

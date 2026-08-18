@@ -342,7 +342,18 @@
     background:rgba(251,247,238,0.82); border-radius:10px; padding:8px;
     max-height:34vh; overflow-y:auto;
   }
-  .fab-sw{ width:38px; height:38px; border-radius:8px; border:2px solid var(--ink); cursor:pointer; padding:0; }
+  .fab-sw{
+    width:38px; height:38px; border-radius:8px; border:2px solid var(--ink);
+    cursor:pointer; padding:0; position:relative;
+    display:flex; align-items:center; justify-content:center;
+  }
+  /* material initial stamped over the swatch: W wool, S silk, C cashmere.
+     Paper-coloured with an ink halo so it reads on ivory and charcoal alike. */
+  .fab-mk{
+    font-family:var(--tag); font-size:16px; line-height:1; color:var(--paper);
+    pointer-events:none; -webkit-text-stroke:0.9px var(--ink); paint-order:stroke fill;
+    text-shadow:0 0 3px var(--ink), 0 1px 2px rgba(43,38,32,0.95);
+  }
   .fab-sw.sel{ outline:3px solid var(--thread-red); outline-offset:2px; }
   .fab-sw:disabled{ opacity:0.25; cursor:default; }
   /* collapsed picker: one tappable chip showing the chosen fabric */
@@ -742,6 +753,12 @@ MATERIALS.forEach(function(m){
   });
 });
 
+/* The dearest cloth in the catalogue, used to size a patron's purse against the
+   most expensive version of a garment that could ever be made. */
+var MAX_VALUE_PER_YARD = FABRICS.reduce(function(m,f){
+  return Math.max(m, f.valuePerYard!=null ? f.valuePerYard : f.pricePerYard);
+}, 0);
+
 var SHAPES = {
   topShape:{ viewBox:[140,190], gx:70, points:[[40,15],[60,5],[80,5],[100,15],[125,38],[108,58],[100,45],[100,178],[40,178],[40,45],[32,58],[15,38]] },
   bottomShape:{ viewBox:[140,190], gx:70, points:[[46,10],[94,10],[104,180],[80,180],[76,90],[70,98],[64,90],[60,180],[36,180]] },
@@ -914,6 +931,13 @@ function darken(h,p){ return shade(h,-p); }
 function fabricLabel(f){ return f.premium ? f.materialName+' '+f.patternName : f.patternName; }
 function fabricFullName(f){ return f.colorName+' '+fabricLabel(f); }
 
+/* The initial stamped over a swatch in the cutting menu so the material is
+   readable at a glance: W wool, S silk, C cashmere. Cotton is left bare. */
+function materialMark(f){
+  if (!f || !f.premium) return '';
+  return '<span class="fab-mk">'+f.materialName.charAt(0)+'</span>';
+}
+
 /* What a yard of this cloth is worth on a finished piece, as opposed to what it
    cost to buy. They are equal for cotton and progressively higher for luxury. */
 function fabricValuePerYard(f){ return (f && f.valuePerYard!=null) ? f.valuePerYard : (f?f.pricePerYard:0); }
@@ -1053,6 +1077,38 @@ function wealthRoll(){
   return Math.random()<0.42 ? rnd(2.4, 5.2) : 1;
 }
 
+/* Rarely, a genuine patron walks in with real money. Their purse is sized to the
+   very best version of whatever they came for -- every piece cut from the dearest
+   bolt in the shop and finished flawlessly -- plus a fifth again on top as the
+   shop's margin. That is what makes a cashmere ballgown worth cutting: the most
+   expensive gown possible fairly fetches about $845, so its patron arrives with
+   roughly $1,000 and the difference is profit. */
+var PATRON_CHANCE = 0.08;    /* how often a patron walks in */
+var PATRON_MIN = 200;        /* floor, so even a small piece is worth cutting well */
+var PATRON_MARGIN = 1.2;     /* 20% over the finest version's fair price */
+var PATRON_SPREAD = 0.15;    /* patron to patron variation either side of that */
+var PATRON_BRIEF_YARDS = 4;  /* what an open brief (custom / exclusive) is worth */
+
+/* (1.2 + quality/100) evaluated at a flawless 100% match -- see fairPrice(). */
+var QUALITY_TOP_MULT = 2.2;
+
+/* What the finest possible version of this garment would fairly fetch. A garment
+   with no fixed pattern pieces (a custom brief, or an exclusive) is valued as a
+   few good pieces' worth of work. */
+function topFairPrice(garment){
+  var yards = (garment && garment.parts && garment.parts.length)
+    ? garment.parts.reduce(function(s,p){ return s+p.yards; }, 0)
+    : PATRON_BRIEF_YARDS;
+  return yards * MAX_VALUE_PER_YARD * QUALITY_TOP_MULT;
+}
+
+/* Lifts a budget into patron territory. Never lowers one that is already higher. */
+function patronBudget(budget, garment){
+  if (Math.random() >= PATRON_CHANCE) return null;
+  var purse = topFairPrice(garment) * PATRON_MARGIN * rnd(1-PATRON_SPREAD, 1+PATRON_SPREAD);
+  return Math.max(budget, PATRON_MIN, Math.round(purse));
+}
+
 function generateGuest(){
   var pool = enabledGarments(); if (!pool.length) pool = GARMENT_TYPES;
   var garment = pick(pool);
@@ -1069,14 +1125,18 @@ function generateGuest(){
   var est = garment.parts.reduce(function(s,p){ return s+p.yards*6.5; },0);
   var repF = 1 + (state.reputation-50)/220;
   var wealth = wealthRoll();
+  var budget = Math.round(est*rnd(1.5,2.6)*repF*wealth);
+  var patron = patronBudget(budget, garment);
+  if (patron!=null) budget = patron;
   return {
     id:'t'+(ticketSeq++),
     name:pick(GUEST_NAMES),
     garment:garment,
     wantColors:wantColors,
     wantPattern:wantPattern,
-    budget:Math.round(est*rnd(1.5,2.6)*repF*wealth),
-    affluent:wealth>1,
+    budget:budget,
+    affluent:wealth>1 || patron!=null,
+    patron:patron!=null,
     arrivedAt:state.clock,
     patience:Math.round(rnd(130,210))
   };
@@ -1100,6 +1160,10 @@ function generateCustomGuest(){
   }
   var repF=1+(state.reputation-50)/220;
   var wealth=wealthRoll();
+  var budget=Math.round(rnd(70,190)*repF*wealth);
+  /* a custom brief has no fixed pieces, so the patron purse is sized generically */
+  var patron=patronBudget(budget, null);
+  if (patron!=null) budget=patron;
   return {
     id:'t'+(ticketSeq++),
     name:pick(GUEST_NAMES),
@@ -1107,8 +1171,9 @@ function generateCustomGuest(){
     garment:{ id:'custom', name:'Custom Design', parts:[] },
     wantColors:wantColors,
     wantPattern:'any',
-    budget:Math.round(rnd(70,190)*repF*wealth),
-    affluent:wealth>1,
+    budget:budget,
+    affluent:wealth>1 || patron!=null,
+    patron:patron!=null,
     arrivedAt:state.clock,
     patience:Math.round(rnd(150,240))
   };
@@ -1140,14 +1205,18 @@ function generateExclusiveGuest(){
   var repF=1+(state.reputation-50)/220;
   var base=ex.value||ex.cost||40;
   var wealth=wealthRoll();
+  var budget=Math.round(base*rnd(1.1,1.6)*repF*wealth);
+  var patron=patronBudget(budget, null);
+  if (patron!=null) budget=patron;
   return {
     id:'t'+(ticketSeq++),
     name:pick(GUEST_NAMES),
     exclusiveId:ex.id, exclusiveName:ex.name,
     garment:{ id:'exclusive', name:'Exclusive: '+ex.name },
     wantColors:['any'], wantPattern:'any',
-    affluent:wealth>1,
-    budget:Math.round(base*rnd(1.1,1.6)*repF*wealth),
+    affluent:wealth>1 || patron!=null,
+    patron:patron!=null,
+    budget:budget,
     arrivedAt:state.clock,
     patience:Math.round(rnd(130,210))
   };
@@ -2554,13 +2623,18 @@ function hasSave(){
   try{ return !!window.localStorage.getItem(SAVE_KEY); }catch(e){ return false; }
 }
 
-function loadGame(){
+/* Restores the saved game. Returns true only if a save was actually applied, so
+   the caller can fall back to a fresh game when there is nothing to restore or
+   the stored data turns out to be unusable. Pass auto=true for the silent
+   startup restore, which words its confirmation differently. */
+function loadGame(auto){
   var raw;
   try{ raw=window.localStorage.getItem(SAVE_KEY); }
-  catch(e){ toast('Could not read storage.'); return; }
-  if (!raw){ toast('No saved game found.'); return; }
+  catch(e){ toast('Could not read storage.'); return false; }
+  if (!raw){ if (!auto) toast('No saved game found.'); return false; }
   var d;
-  try{ d=JSON.parse(raw); }catch(e){ toast('Save file is unreadable.'); return; }
+  try{ d=JSON.parse(raw); }
+  catch(e){ toast('Save file is unreadable &mdash; starting a new game.'); return false; }
 
   stopClock();
   state=freshState();
@@ -2585,8 +2659,9 @@ function loadGame(){
   if (!state.upgrades.highEndFabrics) state.ui.shopMat='cotton';
   state.phase='closed';
   state.ui.modal=null;
-  toast('Game loaded &mdash; Day ' + state.day + '.');
+  toast((auto?'Resumed &mdash; Day ':'Game loaded &mdash; Day ') + state.day + '.');
   renderAll();
+  return true;
 }
 
 function newGame(){
@@ -2937,7 +3012,9 @@ function bodyTicketDetail(){
           '<div class="dc-block"><div class="lbl">Brief</div><div class="note">No pattern and no garment type &mdash; design whatever you like. Add one or more pieces, cut any shapes, arrange them, and name your price.</div></div>'+
         '</div>'+
       '</div>'+
-      (t.affluent ? '<div class="hint">A discerning client &mdash; luxury cloth will pay for itself here.</div>' : '')+
+      (t.patron
+        ? '<div class="hint">A wealthy patron &mdash; this is the budget to cut cashmere against.</div>'
+        : (t.affluent ? '<div class="hint">A discerning client &mdash; luxury cloth will pay for itself here.</div>' : ''))+
       (state.guest ? '<div class="hint">You are already working an order.</div>' : '')+
       '<button class="btn good" data-act="accept" data-id="'+t.id+'" '+(state.guest?'disabled':'')+'>Accept Custom Order</button>'+
       '<button class="btn bad" data-act="decline" data-id="'+t.id+'">Turn Away</button>';
@@ -2955,7 +3032,9 @@ function bodyTicketDetail(){
         '<div class="dc-block"><div class="lbl">Pattern Pieces</div><div class="note">'+pieces+'</div></div>'+
       '</div>'+
     '</div>'+
-    (t.affluent ? '<div class="hint">A discerning client &mdash; luxury cloth will pay for itself here.</div>' : '')+
+    (t.patron
+      ? '<div class="hint">A wealthy patron &mdash; this is the budget to cut cashmere against.</div>'
+      : (t.affluent ? '<div class="hint">A discerning client &mdash; luxury cloth will pay for itself here.</div>' : ''))+
     (state.guest ? '<div class="hint">You are already working an order. Finish it before taking another.</div>' : '')+
     '<button class="btn good" data-act="accept" data-id="'+t.id+'" '+(state.guest?'disabled':'')+'>Accept Order</button>'+
     '<button class="btn bad" data-act="decline" data-id="'+t.id+'">Turn Away</button>';
@@ -3112,7 +3191,8 @@ function bodyTrace(){
       var sel=hasFabric && st.fabricId===f.id;
       return '<button class="fab-sw'+(sel?' sel':'')+'" style="background:'+swatchBg(f)+'" '+
         'data-act="pick-fabric" data-part="'+pid+'" data-id="'+f.id+'" '+(can?'':'disabled')+
-        ' title="'+fabricFullName(f)+' &middot; '+avail.toFixed(1)+'yd"></button>';
+        ' title="'+fabricFullName(f)+' &middot; '+avail.toFixed(1)+'yd">'+
+        materialMark(f)+'</button>';
     }).join('');
     fabricZone='<div class="fabric-zone">'+
         '<div class="chip-label">Choose Fabric</div>'+
@@ -3226,7 +3306,8 @@ function bodyCustomCut(){
       var sel=d.fabricId===f.id;
       return '<button class="fab-sw'+(sel?' sel':'')+'" style="background:'+swatchBg(f)+'" '+
         'data-act="pick-custom-fabric" data-id="'+f.id+'" '+(can?'':'disabled')+
-        ' title="'+fabricFullName(f)+' &middot; '+avail.toFixed(1)+'yd"></button>';
+        ' title="'+fabricFullName(f)+' &middot; '+avail.toFixed(1)+'yd">'+
+        materialMark(f)+'</button>';
     }).join('');
     fabricZone='<div class="fabric-zone"><div class="chip-label">Choose Cloth</div>'+
       '<div class="fabric-grid">'+grid+'</div></div>';
@@ -3943,7 +4024,7 @@ document.addEventListener('click', function(e){
 
     case 'next-day': nextDay(); break;
     case 'save': saveGame(); if (state.ui.modal==='menu') renderModal(); break;
-    case 'load': loadGame(); break;
+    case 'load': loadGame(false); break;
     case 'new-game': newGame(); break;
   }
 });
@@ -3985,7 +4066,9 @@ window.addEventListener('orientationchange', function(){
 /* ============================= INIT ============================= */
 
 loadSettings();
-renderAll();
+/* Pick up where the player left off. A first-time visitor -- or anyone whose
+   stored save cannot be read -- simply starts a fresh Day 1 instead. */
+if (!hasSave() || !loadGame(true)) renderAll();
 
 })();
 </script>
