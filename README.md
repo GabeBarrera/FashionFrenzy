@@ -15,9 +15,10 @@ it runs.
 1. [Quick start](#quick-start)
 2. [File structure](#file-structure)
 3. [What the game does](#what-the-game-does)
-4. [Core systems and functions](#core-systems-and-functions)
-5. [Local storage keys](#local-storage-keys)
-6. [Issues, inefficiencies, and things to improve](#issues-inefficiencies-and-things-to-improve)
+4. [Shop upgrades](#shop-upgrades)
+5. [Core systems and functions](#core-systems-and-functions)
+6. [Local storage keys](#local-storage-keys)
+7. [Issues, inefficiencies, and things to improve](#issues-inefficiencies-and-things-to-improve)
 
 ---
 
@@ -60,18 +61,18 @@ The file is one document with three regions:
 
 | Region | Approx. lines | Contents |
 | --- | --- | --- |
-| `<head>` + `<style>` | 1&ndash;591 | Meta tags, PWA hooks, Google Fonts link, and the complete stylesheet as CSS custom properties plus component classes |
-| `<body>` | 593&ndash;601 | Five empty mount points: `#hud`, `#scene`, `#tray`, `#modal-root`, `#toast` |
-| `<script>` | 602&ndash;3534 | One IIFE in strict mode containing all game code |
+| `<head>` + `<style>` | 1&ndash;~640 | Meta tags, PWA hooks, Google Fonts link, and the complete stylesheet as CSS custom properties plus component classes |
+| `<body>` | ~642&ndash;650 | Five empty mount points: `#hud`, `#scene`, `#tray`, `#modal-root`, `#toast` |
+| `<script>` | ~651&ndash;3700 | One IIFE in strict mode containing all game code |
 
 The script is organised into labelled sections, in order:
 
 ```
-SCENE_IMG (base64)  ->  storage keys + settings  ->  STATIC DATA  ->  TIME CONSTANTS
-->  STATE  ->  HELPERS  ->  ORDER GENERATION  ->  SCORING  ->  CUTTING
-->  CUSTOM ORDERS  ->  CATALOG & EXCLUSIVES  ->  SVG piece rendering  ->  ASSEMBLY
-->  ORDER FLOW  ->  CLEARANCE  ->  DAY CYCLE  ->  SAVE / LOAD
-->  RENDER: HUD / SCENE / TRAY / MODALS  ->  EVENTS  ->  INIT
+SCENE_IMG (base64)  ->  storage keys + settings  ->  STATIC DATA  ->  UPGRADES
+->  TIME CONSTANTS  ->  STATE  ->  HELPERS  ->  ORDER GENERATION  ->  SCORING
+->  CUTTING  ->  CUSTOM ORDERS  ->  CATALOG & EXCLUSIVES  ->  SVG piece rendering
+->  ASSEMBLY  ->  CUSTOMER DIALOGUE  ->  ORDER FLOW  ->  CLEARANCE  ->  DAY CYCLE
+->  SAVE / LOAD  ->  RENDER: HUD / SCENE / TRAY / MODALS  ->  EVENTS  ->  INIT
 ```
 
 ### The five mount points
@@ -79,7 +80,8 @@ SCENE_IMG (base64)  ->  storage keys + settings  ->  STATIC DATA  ->  TIME CONST
 - **`#hud`** &mdash; top bar: cash, reputation (tap to flip between stars and a decimal), total
   sales, and a day/clock card that doubles as a progress bar filling toward closing time.
 - **`#scene`** &mdash; the atelier artwork with invisible hotspot buttons pinned to features in the
-  image (thread spools &rarr; fabric shop, cubby &rarr; clearance rack, pinned cards &rarr; catalog).
+  image (pegboard &rarr; upgrades, thread spools &rarr; fabric shop, cubby &rarr; clearance rack,
+  pinned cards &rarr; catalog).
   When an order is in progress, the working panel is overlaid directly on the wooden table.
 - **`#tray`** &mdash; the horizontal strip of order tickets at the bottom.
 - **`#modal-root`** &mdash; every bottom-sheet and full-screen modal.
@@ -143,10 +145,28 @@ Any garment can be switched off in the **Catalog**, and guests will stop asking 
 
 ### Fabric
 
-Eight colors &times; three patterns = **24 fabrics**, generated at load. Price per yard is
-`4 + round(rarity &times; 2) + patternSurcharge`, where rarity runs from 0.7 (ivory, charcoal) up to
-1.6 (royal purple), and the surcharge is 0 for solid, +2 stripes, +3 polka dot. Fabric is bought
-in 2-yard increments from the shop, grouped color-first.
+Four materials &times; eight colors &times; three patterns = **96 bolts**, generated at load. The
+base price per yard is `4 + round(rarity &times; 2) + patternSurcharge`, where rarity runs from 0.7
+(ivory, charcoal) up to 1.6 (royal purple), and the surcharge is 0 for solid, +2 stripes, +3 polka
+dot. That base is then scaled by the material:
+
+| Material | Cost multiplier | Value multiplier | Available |
+| --- | --- | --- | --- |
+| Cotton | 1.0 | 1.0 | From day one |
+| Wool | 2.1 | 2.9 | High-End Fabrics upgrade |
+| Silk | 3.0 | 4.4 | High-End Fabrics upgrade |
+| Cashmere | 4.2 | 6.4 | High-End Fabrics upgrade |
+
+Every bolt therefore carries two numbers: `pricePerYard`, what it costs at the counter, and
+`valuePerYard`, what a yard of it is worth once made up into a garment. They are equal for cotton
+and increasingly divergent for luxury cloth, which is what makes silk and cashmere a margin play
+rather than simply an expense.
+
+The 24 cotton bolts are generated first, so the original ids `f0`&ndash;`f23` keep their exact
+meaning and saves written before the upgrade existed still load correctly.
+
+Fabric is bought in 2-yard increments from the shop, filtered by material and then grouped
+color-first.
 
 ### Cutting &mdash; the core minigame
 
@@ -179,8 +199,9 @@ drag-to-reorder layer strip controlling what sits in front.
 
 ### Pricing and the sale
 
-`fairPrice() = (materialCost + labor) &times; (1.2 + quality/100)`. You set your asking price with a
-slider. When you present:
+`fairPrice() = (madeUpValue + labor) &times; (1.2 + quality/100)`, where `madeUpValue` is the sum of
+each piece's `valuePerYard &times; yards` (falling back to raw material cost for anything cut before
+materials existed). You set your asking price with a slider. When you present:
 
 ```
 priceFactor = price > budget ? 0 : clamp(1 - max(0, price/fairPrice - 1) &times; 0.6, 0, 1)
@@ -196,6 +217,25 @@ Reputation moves by `clamp(round((satisfaction - 55) / 9), -5, 5)`, and a reject
 raise it. Rejected garments go to the **clearance rack**, where you can sell them at 55% of base
 value, recycle them for half their yardage back, or donate up to 5 at a time for +4 reputation
 each (a fifth of a star).
+
+Either way, the guest says something. The result screen quotes one of ten positive lines on a
+sale, or a line matched to exactly what went wrong on a refusal.
+
+### Customer dialogue
+
+Failures are classified into four flaw keys &mdash; `color`, `pattern`, `precision`, `price` &mdash;
+and `NEGATIVE_LINES` is keyed by every one of the fifteen combinations plus a `none` set for the
+guest who simply was not in the mood. That is 42 negative lines and 10 positive ones.
+
+Lines are authored with `[[WORD]]` markers around the thing that went wrong, and `flawify()`
+rewrites each marker into `<span class="flaw">`, which renders bold and in the theme's red:
+
+```js
+'It is the wrong [[COLOR]] and far too [[EXPENSIVE]] on top of that.'
+```
+
+Every line for a given combination names every flaw in that combination, so a guest refusing on
+colour and price always calls out both.
 
 ### Exclusives
 
@@ -215,6 +255,41 @@ guests start asking for it by name and will pay `value &times; random(1.1, 1.6) 
 
 ---
 
+## Shop upgrades
+
+Bought from the **pegboard above the cutting table** (and from a button on the closed-day card,
+since the pegboard sits behind it while the shop is shut). Upgrades are permanent: they are written
+into the save file and survive every save and load, and are cleared only by starting a new game.
+An affordable upgrade puts a badge on the pegboard hotspot.
+
+### High-End Fabrics &mdash; $400
+
+A single purchase. Unlocks the wool, silk, and cashmere versions of every bolt the shop carries
+(see [Fabric](#fabric) above), adds a material filter to the fabric shop, and starts bringing
+wealthier guests through the door: `wealthRoll()` gives roughly 42% of arrivals a budget
+multiplier of 2.4&times; to 5.2&times;, and those tickets are flagged as a discerning client so the
+player knows luxury cloth will pay for itself. Once bought, the button is grayed out and reads
+**Purchased**.
+
+### Accessories &mdash; $500, then $1000, then $2000
+
+A three-step chain. The row always offers the next step and shows what is currently owned
+underneath. Once an accessory counter exists, every piece presented has a flat **30% chance** of an
+extra sale, rolled independently of the garment sale &mdash; the guest may reject the dress and
+still walk out with a scarf. The payout is a random integer in the tier's range, added to cash,
+lifetime sales, and the day's earnings, reported on the result screen and totalled on the day
+summary.
+
+| Step | Cost | Payout per sale |
+| --- | --- | --- |
+| Accessories | $500 | $10 &ndash; $30 |
+| Quality Accessories | $1000 | $40 &ndash; $70 |
+| High-End Accessories | $2000 | $80 &ndash; $150 |
+
+After the third step the button is grayed out and reads **Purchased**.
+
+---
+
 ## Core systems and functions
 
 ### State
@@ -229,6 +304,7 @@ transient per-order and UI state:
   rack,           // rejected garments
   exclusives,     // player-designed signature pieces
   catalogOff,     // { garmentId: true } for switched-off offerings
+  upgrades,       // { highEndFabrics: bool, accessories: 0-3 }
   phase,          // 'closed' | 'open' | 'summary'
   clock, tickets, nextSpawnAt, closingPending, dayStats,
   guest,          // the order being worked
@@ -263,6 +339,7 @@ Three module-level counters live outside it: `ticketSeq`, `rackSeq`, `exclusiveS
 | Function | Purpose |
 | --- | --- |
 | `generateGuest()` / `generateCustomGuest()` / `generateExclusiveGuest()` | Build the three ticket types |
+| `wealthRoll()` | Budget multiplier for the affluent clientele High-End Fabrics attracts |
 | `spawnTicket()` | Picks which type to spawn, respecting `MAX_ORDERS` and switched-off offerings |
 | `partMatchQuality(fabricId)` | 0&ndash;100 color+pattern match score for one piece |
 | `currentOverallQuality()` | Weighted running quality across all pieces of the current order |
@@ -281,6 +358,22 @@ Three module-level counters live outside it: `ticketSeq`, `rackSeq`, `exclusiveS
 | `finishPieceIfDone` | Closes the piece, scores precision, deducts stock |
 | `initCuttingCanvas(canvas, partId)` | DPR-aware canvas setup, drawing, and pointer handling |
 | `initFreeCanvas(canvas)` | Guide-free variant for custom pieces |
+
+**Upgrades, materials, and dialogue**
+
+| Function | Purpose |
+| --- | --- |
+| `buyUpgrade(key)` | Debits cash and unlocks `'fabrics'` or the next `'accessories'` step |
+| `affordableUpgrades()` | How many upgrades are buyable right now, for the pegboard badge |
+| `bodyUpgrades()` | The upgrades screen, including the grayed-out Purchased states |
+| `materialById` / `unlockedMaterials` | Material lookup and what the shop currently stocks |
+| `fabricLabel` / `fabricFullName` | Display names; premium bolts name their material |
+| `fabricValuePerYard(f)` | Made-up worth per yard, as opposed to counter price |
+| `pickerFabrics()` | Cutting-table picker: all cotton, plus premium cloth actually in stock |
+| `accessoryTier()` / `accessoryRange()` | Current accessory step and its payout band |
+| `rollAccessorySale()` | The independent 30% roll and its integer payout |
+| `guestLine(accepted, flaws)` | Picks what the guest says, matched to the exact failure set |
+| `flawify(s)` | Rewrites `[[WORD]]` markers into red bold callouts |
 
 **Custom orders**
 
@@ -342,7 +435,7 @@ Written by `saveGame()`, read by `loadGame()`, existence-checked by `hasSave()`.
 
 | Field | Type | What is stored |
 | --- | --- | --- |
-| `v` | number | Save format version. Currently hardcoded to `2` on write |
+| `v` | number | Save format version. Currently hardcoded to `3` on write |
 | `day` | number | Current day number |
 | `cash` | number | Cash on hand |
 | `reputation` | number | 0&ndash;100 reputation score (displayed as 0&ndash;5 stars) |
@@ -354,6 +447,7 @@ Written by `saveGame()`, read by `loadGame()`, existence-checked by `hasSave()`.
 | `exclusives` | array | Player-designed signature pieces. Each entry: `{ id, name, cutGarment, customItems, customArrange, cost, quality, value }` &mdash; including every cut piece's full point array, fabric, and arrangement transform |
 | `catalogOff` | object | Switched-off standard garments as `{ garmentId: true }` |
 | `exclusiveSeq` | number | Next exclusive id counter |
+| `upgrades` | object | Permanent shop upgrades: `{ highEndFabrics: boolean, accessories: 0-3 }`. `accessories` is how many steps have been bought &mdash; 0 none, 1 Accessories, 2 Quality, 3 High-End |
 
 **Explicitly not saved:** the in-progress order (`guest`, `cutting`, `assembly`, `cutGarment`,
 `customItems`, `customDraft`, `customArrange`, `price`, `lastResult`), the live day
@@ -361,7 +455,9 @@ Written by `saveGame()`, read by `loadGame()`, existence-checked by `hasSave()`.
 UI state. `loadGame()` always restores you to `phase: 'closed'` at the start of the saved day.
 
 On load, every field is defensively defaulted: a missing `cash` falls back to 150, `reputation` to
-50, `rack` and `exclusives` to empty arrays, and the sequence counters to `length + 1`.
+50, `rack` and `exclusives` to empty arrays, and the sequence counters to `length + 1`. A save
+written before upgrades existed (`v: 2`, no `upgrades` key) loads cleanly with both upgrades
+locked, and the accessory step is clamped to the range the game actually defines.
 
 ### 2. `fashionfrenzy_settings`
 
@@ -402,9 +498,10 @@ Ordered roughly by impact.
    deducted from stock. Either persist the working state or disable the save button while an
    order is open.
 
-3. **The `v` field is written but never read.** `saveGame()` stamps `v: 2` and `loadGame()`
-   ignores it entirely. There is no migration path, so a future format change will load garbage
-   into a fresh state rather than upgrading or refusing. Add a version switch on load.
+3. **The `v` field is written but never read.** `saveGame()` stamps `v: 3` and `loadGame()`
+   ignores it entirely. Every field is defensively defaulted, so older saves do load correctly
+   today, but there is still no explicit migration path &mdash; a future format change will load
+   garbage into a fresh state rather than upgrading or refusing. Add a version switch on load.
 
 4. **`ticketSeq` is neither saved nor reset on load.** After `loadGame()` it keeps counting from
    wherever the current session left off. Harmless today because ticket ids are session-scoped,
@@ -466,7 +563,7 @@ Ordered roughly by impact.
     place.
 
 15. **`toast()` renders unescaped user input.** The toast body is assigned with `innerHTML`, and
-    several call sites interpolate player-supplied names without `esc()` &mdash; notably
+    several call sites still interpolate player-supplied names without `esc()` &mdash; notably
     `finishCustomItem()`'s `toast(name + ' cut ...')`, where `name` comes straight from the item
     name field. It is only self-XSS, but a piece named `<img onerror=...>` will execute. Escape at
     the call sites, or make `toast()` escape and take an explicit opt-in for markup.
@@ -484,11 +581,10 @@ Ordered roughly by impact.
     `var(--good)` unconditionally while *Precision matters* is off, so the pricing screen reports
     a 32% cut as green. Grey it out or hide the cue instead of miscolouring it.
 
-19. **UTF-8 BOM at the top of `index.html`.** The file is otherwise pure ASCII (the codebase
-    consistently uses HTML entities such as `&mdash;` and `&middot;` rather than literal
-    characters, which is the right call for cross-platform rendering). The stray BOM before
-    `<!DOCTYPE html>` can push some parsers into quirks mode and shows up as `&#xFEFF;` in
-    diffs and editors on Windows. Strip it.
+19. ~~**UTF-8 BOM at the top of `index.html`.**~~ *Fixed.* The file is now pure ASCII end to end.
+    The codebase consistently uses HTML entities such as `&mdash;` and `&middot;` rather than
+    literal characters, which is the right call for cross-platform rendering; the stray BOM before
+    `<!DOCTYPE html>` has been stripped.
 
 ### Performance
 

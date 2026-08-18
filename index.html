@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -581,6 +581,57 @@
   .tw-actions{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:11px; }
   .tw-actions .btn{ margin-top:0; }
 
+  /* ---------- upgrades ---------- */
+  .upg-row{
+    display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center;
+    background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:12px 13px; margin-bottom:10px;
+  }
+  /* only the row title is a block; emphasis inside the blurb stays inline */
+  .upg-txt > b{ font-family:var(--display); font-weight:700; font-size:15.5px; display:block; }
+  .upg-txt small{ display:block; font-size:11.5px; color:#8a8069; margin-top:3px; line-height:1.45; }
+  .upg-txt small b{ display:inline; font-family:inherit; font-size:inherit; font-weight:600; color:#5f5747; }
+  .upg-tier{
+    display:block; font-family:var(--tag); font-size:9px; text-transform:uppercase;
+    color:var(--brass); letter-spacing:0.05em; margin-top:6px;
+  }
+  .upg-buy{
+    flex:0 0 auto; font-family:var(--tag); font-size:10.5px; text-transform:uppercase;
+    background:var(--thread-green); color:#fff; border:1px solid var(--ink); border-radius:7px;
+    padding:10px 12px; cursor:pointer; white-space:nowrap; min-width:88px; text-align:center;
+  }
+  .upg-buy:active{ transform:translateY(1px); }
+  .upg-buy:disabled{ background:#bdb49c; border-color:var(--line); color:#f4f0e6; cursor:default; transform:none; }
+  .upg-buy.owned{ background:var(--canvas); color:#9a917b; border-color:var(--line); cursor:default; }
+  .upg-buy .cost{ display:block; font-size:12.5px; margin-top:2px; }
+
+  /* material tabs in the fabric shop */
+  .mat-tabs{ display:flex; gap:6px; margin:0 0 10px; overflow-x:auto; padding-bottom:2px; }
+  .mat-tab{
+    flex:1 0 auto; font-family:var(--tag); font-size:10.5px; text-transform:uppercase;
+    border:1px solid var(--ink); border-radius:7px; padding:8px 10px;
+    background:var(--paper); cursor:pointer; white-space:nowrap;
+  }
+  .mat-tab.on{ background:var(--ink); color:#fff; }
+  .lux{
+    font-family:var(--tag); font-size:8.5px; text-transform:uppercase; letter-spacing:0.05em;
+    color:var(--brass); border:1px solid var(--brass); border-radius:4px;
+    padding:0 4px; margin-left:6px; vertical-align:1px;
+  }
+
+  /* ---------- customer dialogue + accessory sale on the result page ---------- */
+  .say{
+    font-family:var(--display); font-style:italic; font-size:16.5px; line-height:1.45;
+    margin:10px 0 2px; color:var(--ink);
+  }
+  .flaw{ color:var(--bad); font-weight:800; font-style:normal; }
+  .acc-line{
+    margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);
+    font-family:var(--tag); font-size:11px; text-transform:uppercase;
+    letter-spacing:0.04em; color:var(--thread-green);
+  }
+  .acc-line b{ font-family:var(--display); font-size:15px; text-transform:none; letter-spacing:0; }
+
   ::-webkit-scrollbar{ width:7px; height:7px; }
   ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
 
@@ -650,26 +701,45 @@ var PATTERNS = [
   {id:'dots', name:'Polka Dot', priceAdd:3}
 ];
 
-/* Build every colour x pattern combination, colour-major so the shop menu
-   can group the three pattern bolts under each colour. */
-var FABRIC_RECIPES = [];
-COLORS.forEach(function(c){
-  PATTERNS.forEach(function(p){ FABRIC_RECIPES.push([c.id, p.id]); });
-});
+/* Cloth materials. Cotton is stocked from opening day; the other three are
+   unlocked by the High-End Fabrics upgrade. They cost more per yard, but a
+   finished piece made from them is worth considerably more than the extra
+   outlay, so luxury cloth is a margin play rather than just an expense. */
+var MATERIALS = [
+  {id:'cotton',   name:'Cotton',   premium:false, costMult:1,   valueMult:1},
+  {id:'wool',     name:'Wool',     premium:true,  costMult:2.1, valueMult:2.9},
+  {id:'silk',     name:'Silk',     premium:true,  costMult:3.0, valueMult:4.4},
+  {id:'cashmere', name:'Cashmere', premium:true,  costMult:4.2, valueMult:6.4}
+];
+function materialById(id){
+  for (var i=0;i<MATERIALS.length;i++){ if (MATERIALS[i].id===id) return MATERIALS[i]; }
+  return MATERIALS[0];
+}
 
 function colorRarity(id){
   var rare = {purple:1.6, gold:1.4, emerald:1.3, navy:1, crimson:0.9, blush:0.9};
   return rare[id] || 0.7;
 }
 
-var FABRICS = FABRIC_RECIPES.map(function(r,i){
-  var c = COLORS.filter(function(x){ return x.id===r[0]; })[0];
-  var p = PATTERNS.filter(function(x){ return x.id===r[1]; })[0];
-  return {
-    id:'f'+i, colorId:c.id, colorName:c.name, hex:c.hex,
-    patternId:p.id, patternName:p.name,
-    pricePerYard: 4 + Math.round(colorRarity(c.id)*2) + p.priceAdd
-  };
+/* Build every material x colour x pattern bolt, colour-major within a material
+   so the shop menu can group the three pattern bolts under each colour.
+   Cotton is generated FIRST so the original ids f0..f23 keep their exact
+   meaning and saves written before the upgrade existed still load correctly. */
+var FABRICS = [];
+MATERIALS.forEach(function(m){
+  COLORS.forEach(function(c){
+    PATTERNS.forEach(function(p){
+      var base = 4 + Math.round(colorRarity(c.id)*2) + p.priceAdd;
+      FABRICS.push({
+        id:'f'+FABRICS.length,
+        colorId:c.id, colorName:c.name, hex:c.hex,
+        patternId:p.id, patternName:p.name,
+        materialId:m.id, materialName:m.name, premium:m.premium,
+        pricePerYard: Math.round(base*m.costMult),
+        valuePerYard: Math.round(base*m.valueMult*10)/10
+      });
+    });
+  });
 });
 
 var SHAPES = {
@@ -717,6 +787,25 @@ var GUEST_NAMES = [
   'Ansel Boucher','Ruthie Callahan','Dax Farrow','Livia Castellan','Otto Reinholt',
   'Marisol Egan','Corwin Blythe','Yumi Aoshima','Dmitri Volkov','Esme Rainier'
 ];
+
+/* ============================= UPGRADES =============================
+   Permanent shop improvements bought from the pegboard above the table.
+   Their unlocked state lives in the save file, so an upgrade is kept for
+   good unless the player starts a new game. */
+
+var UPGRADE_FABRICS_COST = 400;
+
+/* The accessory counter improves in three steps. Each entry is what the NEXT
+   purchase costs and what it raises the per-sale payout to. */
+var ACCESSORY_TIERS = [
+  {name:'Accessories',          cost:500,  min:10, max:30,
+   note:'Sets up an accessory counter. Every piece you present has a 30% chance of an accessory sale worth $10 to $30 &mdash; whether or not the guest takes the garment itself.'},
+  {name:'Quality Accessories',  cost:1000, min:40, max:70,
+   note:'Better trims, buttons, and notions. Accessory sales are worth $40 to $70 instead.'},
+  {name:'High-End Accessories', cost:2000, min:80, max:150,
+   note:'Designer hardware and hand-finished details. Accessory sales are worth $80 to $150 instead.'}
+];
+var ACCESSORY_CHANCE = 0.30;
 
 /* ============================= TIME CONSTANTS ============================= */
 
@@ -769,12 +858,14 @@ function freshState(){
     rack:[],
     exclusives:[],           /* player-designed signature pieces */
     catalogOff:{},           /* garment ids the shop has switched off */
+    upgrades:{ highEndFabrics:false, accessories:0 },   /* permanent, saved with the game */
     phase:'closed',           /* closed | open | summary */
     clock:OPEN_MIN,
     tickets:[],
     nextSpawnAt:0,
     closingPending:false,
-    dayStats:{ sold:0, earned:0, declined:0, expired:0, repStart:50 },
+    dayStats:{ sold:0, earned:0, declined:0, expired:0, repStart:50,
+               accessories:0, accessoryEarned:0 },
     guest:null,               /* the order currently being worked */
     customItems:[],           /* finished pieces on a custom order */
     customDraft:null,         /* the piece currently being made */
@@ -785,7 +876,8 @@ function freshState(){
     price:0,
     lastResult:null,
     ui:{ modal:null, tracePart:null, modalId:null, fabricOpen:true,
-         catalogTab:'std', donateMode:false, donateSel:[], shopColor:null, repDecimal:false }
+         catalogTab:'std', donateMode:false, donateSel:[], shopColor:null,
+         shopMat:'cotton', repDecimal:false }
   };
 }
 
@@ -816,6 +908,30 @@ function shade(hex,pct){
 }
 function lighten(h,p){ return shade(h,p); }
 function darken(h,p){ return shade(h,-p); }
+
+/* Bolts are listed by pattern; premium cloth names its material too, so
+   "Stripes" stays "Stripes" but silk reads as "Silk Stripes". */
+function fabricLabel(f){ return f.premium ? f.materialName+' '+f.patternName : f.patternName; }
+function fabricFullName(f){ return f.colorName+' '+fabricLabel(f); }
+
+/* What a yard of this cloth is worth on a finished piece, as opposed to what it
+   cost to buy. They are equal for cotton and progressively higher for luxury. */
+function fabricValuePerYard(f){ return (f && f.valuePerYard!=null) ? f.valuePerYard : (f?f.pricePerYard:0); }
+
+/* Materials the shop currently stocks. */
+function unlockedMaterials(){
+  return MATERIALS.filter(function(m){ return !m.premium || state.upgrades.highEndFabrics; });
+}
+
+/* The cutting-table picker lists every cotton bolt plus any premium cloth the
+   player actually owns, so unlocking three more materials does not bury the
+   grid under seventy-two disabled swatches. */
+function pickerFabrics(){
+  return FABRICS.filter(function(f){
+    if (!f.premium) return true;
+    return state.upgrades.highEndFabrics && ownedYards(f.id)>0;
+  });
+}
 
 function swatchBg(f){
   var base=f.hex, light=lighten(base,20), dark=darken(base,16);
@@ -929,6 +1045,14 @@ function shapeClip(key){
 
 /* ============================= ORDER GENERATION ============================= */
 
+/* Once luxury cloth is on the shelves, word gets around and a slice of the
+   clientele arrives with a much deeper purse -- which is what makes silk and
+   cashmere worth cutting rather than merely worth buying. */
+function wealthRoll(){
+  if (!state.upgrades.highEndFabrics) return 1;
+  return Math.random()<0.42 ? rnd(2.4, 5.2) : 1;
+}
+
 function generateGuest(){
   var pool = enabledGarments(); if (!pool.length) pool = GARMENT_TYPES;
   var garment = pick(pool);
@@ -944,13 +1068,15 @@ function generateGuest(){
   var wantPattern = Math.random()<0.2 ? 'any' : pick(PATTERNS).id;
   var est = garment.parts.reduce(function(s,p){ return s+p.yards*6.5; },0);
   var repF = 1 + (state.reputation-50)/220;
+  var wealth = wealthRoll();
   return {
     id:'t'+(ticketSeq++),
     name:pick(GUEST_NAMES),
     garment:garment,
     wantColors:wantColors,
     wantPattern:wantPattern,
-    budget:Math.round(est*rnd(1.5,2.6)*repF),
+    budget:Math.round(est*rnd(1.5,2.6)*repF*wealth),
+    affluent:wealth>1,
     arrivedAt:state.clock,
     patience:Math.round(rnd(130,210))
   };
@@ -973,6 +1099,7 @@ function generateCustomGuest(){
     }
   }
   var repF=1+(state.reputation-50)/220;
+  var wealth=wealthRoll();
   return {
     id:'t'+(ticketSeq++),
     name:pick(GUEST_NAMES),
@@ -980,7 +1107,8 @@ function generateCustomGuest(){
     garment:{ id:'custom', name:'Custom Design', parts:[] },
     wantColors:wantColors,
     wantPattern:'any',
-    budget:Math.round(rnd(70,190)*repF),
+    budget:Math.round(rnd(70,190)*repF*wealth),
+    affluent:wealth>1,
     arrivedAt:state.clock,
     patience:Math.round(rnd(150,240))
   };
@@ -1011,13 +1139,15 @@ function generateExclusiveGuest(){
   var ex=pick(state.exclusives);
   var repF=1+(state.reputation-50)/220;
   var base=ex.value||ex.cost||40;
+  var wealth=wealthRoll();
   return {
     id:'t'+(ticketSeq++),
     name:pick(GUEST_NAMES),
     exclusiveId:ex.id, exclusiveName:ex.name,
     garment:{ id:'exclusive', name:'Exclusive: '+ex.name },
     wantColors:['any'], wantPattern:'any',
-    budget:Math.round(base*rnd(1.1,1.6)*repF),
+    affluent:wealth>1,
+    budget:Math.round(base*rnd(1.1,1.6)*repF*wealth),
     arrivedAt:state.clock,
     patience:Math.round(rnd(130,210))
   };
@@ -1512,7 +1642,8 @@ function finishCustomItem(){
     name:name, fabricId:d.fabricId,
     cutShape:shaped, cutClip:clip.clip, cutAspect:clip.aspect,
     bw:bw, bh:bh, yards:yards,
-    cost:f.pricePerYard*yards, colorMatch:colorMatch
+    cost:f.pricePerYard*yards, value:fabricValuePerYard(f)*yards,
+    colorMatch:colorMatch
   });
 
   state.customDraft=null;
@@ -1563,8 +1694,12 @@ function customZ(id){
 
 function buildCustomGarment(){
   var items=state.customItems;
-  var cost=0, matches=0;
-  items.forEach(function(it){ cost+=it.cost; if (it.colorMatch) matches++; });
+  var cost=0, val=0, matches=0;
+  items.forEach(function(it){
+    cost+=it.cost;
+    val+=(it.value!=null?it.value:it.cost);
+    if (it.colorMatch) matches++;
+  });
   var quality = items.length ? (matches/items.length)*100 : 0;
   quality = 40 + quality*0.6;    /* an off-palette design still has some worth */
   return {
@@ -1574,7 +1709,7 @@ function buildCustomGarment(){
       return { id:it.id, label:it.name, fabricId:it.fabricId, yards:it.yards,
                cutShape:it.cutShape, cutAspect:it.cutAspect, quality:it.colorMatch?100:40 };
     }),
-    quality:quality, cost:cost, precisionAvg:null, itemCount:items.length,
+    quality:quality, cost:cost, value:val, precisionAvg:null, itemCount:items.length,
     labor:items.length*15   /* design work is worth more than the cloth it used */
   };
 }
@@ -1694,6 +1829,86 @@ function exclusiveArt(ex){
   var html=garmentArt(ex.cutGarment, ART_TARGET_CAT);
   state.customItems=savedItems; state.customArrange=savedArr;
   return html;
+}
+
+/* ---- Buying shop upgrades ---- */
+
+function buyUpgrade(key){
+  if (key==='fabrics'){
+    if (state.upgrades.highEndFabrics) return;
+    if (state.cash < UPGRADE_FABRICS_COST){ toast('Not enough cash for that upgrade.'); return; }
+    state.cash -= UPGRADE_FABRICS_COST;
+    state.upgrades.highEndFabrics = true;
+    toast('High-End Fabrics unlocked &middot; wool, silk, and cashmere are now stocked.');
+    renderAll();
+    return;
+  }
+  if (key==='accessories'){
+    var t=accessoryTier();
+    if (t >= ACCESSORY_TIERS.length) return;
+    var next=ACCESSORY_TIERS[t];
+    if (state.cash < next.cost){ toast('Not enough cash for that upgrade.'); return; }
+    state.cash -= next.cost;
+    state.upgrades.accessories = t+1;
+    toast(esc(next.name)+' unlocked.');
+    renderAll();
+  }
+}
+
+/* How many upgrades the player could buy right now, for the pegboard badge. */
+function affordableUpgrades(){
+  var n=0;
+  if (!state.upgrades.highEndFabrics && state.cash>=UPGRADE_FABRICS_COST) n++;
+  var t=accessoryTier();
+  if (t < ACCESSORY_TIERS.length && state.cash>=ACCESSORY_TIERS[t].cost) n++;
+  return n;
+}
+
+function bodyUpgrades(){
+  /* High-End Fabrics: a single purchase, then permanently owned. */
+  var fabOwned=!!state.upgrades.highEndFabrics;
+  var fabBtn = fabOwned
+    ? '<button class="upg-buy owned" disabled>Purchased</button>'
+    : '<button class="upg-buy" data-act="buy-upgrade" data-id="fabrics"'+
+      (state.cash>=UPGRADE_FABRICS_COST?'':' disabled')+'>Buy'+
+      '<span class="cost">'+money(UPGRADE_FABRICS_COST)+'</span></button>';
+  var fabRow='<div class="upg-row">'+
+      '<div class="upg-txt">'+
+        '<b>High-End Fabrics</b>'+
+        '<small>Opens an account with the luxury mill: <b>wool</b>, <b>silk</b>, and <b>cashmere</b> '+
+          'bolts of every colour and pattern you already carry. They cost more by the yard, but a '+
+          'piece made up from them is worth a great deal more &mdash; and word travels, so guests '+
+          'with deeper pockets start walking through the door.</small>'+
+        (fabOwned?'<span class="upg-tier">Owned &middot; wool, silk, and cashmere in stock</span>':'')+
+      '</div>'+
+      fabBtn+
+    '</div>';
+
+  /* Accessories: a three-step chain. The row always shows the NEXT step. */
+  var t=accessoryTier();
+  var cur  = t>0 ? ACCESSORY_TIERS[t-1] : null;
+  var next = t<ACCESSORY_TIERS.length ? ACCESSORY_TIERS[t] : null;
+  var accBtn = next
+    ? '<button class="upg-buy" data-act="buy-upgrade" data-id="accessories"'+
+      (state.cash>=next.cost?'':' disabled')+'>Buy'+
+      '<span class="cost">'+money(next.cost)+'</span></button>'
+    : '<button class="upg-buy owned" disabled>Purchased</button>';
+  var accTitle = next ? next.name : ACCESSORY_TIERS[ACCESSORY_TIERS.length-1].name;
+  var accNote  = next ? next.note
+    : 'The finest accessory counter in town. Nothing left to add here.';
+  var accRow='<div class="upg-row">'+
+      '<div class="upg-txt">'+
+        '<b>'+esc(accTitle)+'</b>'+
+        '<small>'+accNote+'</small>'+
+        (cur?'<span class="upg-tier">Owned &middot; '+esc(cur.name)+' &middot; '+
+             money(cur.min)+' to '+money(cur.max)+' per sale</span>':'')+
+      '</div>'+
+      accBtn+
+    '</div>';
+
+  return '<div class="hint" style="margin-top:0;">Upgrades are permanent. Once bought they stay '+
+      'with the shop through every save and load, and are only cleared by starting a new game.</div>'+
+    fabRow + accRow;
 }
 
 /* ---- Donations from the clearance rack ---- */
@@ -1851,6 +2066,133 @@ function initAssemblyDrag(stage){
   stage.addEventListener('pointercancel', end);
 }
 
+/* ============================= CUSTOMER DIALOGUE =============================
+   What the guest actually says on the result screen. Words wrapped in [[ ]] are
+   the specific thing that went wrong, and get bolded in red by flawify(). */
+
+var POSITIVE_LINES = [
+  'Oh, it is perfect! I will take it right this minute.',
+  'This is exactly what I pictured. You have a wonderful eye.',
+  'I love it &mdash; it suits the occasion beautifully. Wrap it up!',
+  'Gorgeous work. I shall be telling everyone where I found this.',
+  'You listened to every word I said. That is so rare these days. Sold!',
+  'The line, the colour, the finish. Worth every penny and then some.',
+  'I have been hunting for something like this for months. Thank you!',
+  'Oh my. I did not expect to find this here. It is quite divine.',
+  'Lovely. Truly lovely. Put it on my account and I will be back Friday.',
+  'I could not have described it better myself. It is coming home with me.'
+];
+
+/* Keyed by which things went wrong, in the order colour, pattern, precision,
+   price. Every one of the fifteen combinations has its own lines, plus a
+   no-fault set for the guest who simply was not in the mood. */
+var NEGATIVE_LINES = {
+  'color': [
+    'I think I will pass. It is just not really the [[COLOR]] I asked for.',
+    'Beautifully made, but that [[COLOR]] does nothing for me at all.',
+    'Oh dear. I was very clear about the [[COLOR]], was I not?',
+    'Not this one, I am afraid. The [[COLOR]] is simply wrong for me.'
+  ],
+  'pattern': [
+    'Close, but the [[PATTERN]] is not what I had in mind.',
+    'I do like the shade &mdash; it is the [[PATTERN]] that puts me off.',
+    'Sorry, no. That [[PATTERN]] is all wrong for the occasion.',
+    'The colour is right, but you have gone and used the wrong [[PATTERN]].'
+  ],
+  'precision': [
+    'Oh my. Look at these edges &mdash; the [[CUTTING]] is dreadfully sloppy.',
+    'I can see every crooked line. The [[CUTTING]] is not up to standard.',
+    'No, no. The [[WORKMANSHIP]] here is far too rough for my liking.',
+    'The idea is right, but the [[CUTTING]] is a mess. I will wait, thank you.'
+  ],
+  'price': [
+    'Absolutely not! That is way too [[EXPENSIVE]].',
+    'For that? No thank you. Far too [[EXPENSIVE]] for what it is.',
+    'I adore it, but the [[PRICE]] is simply beyond me today.',
+    'Goodness, that [[PRICE]] made my eyes water. I will leave it.'
+  ],
+  'color+pattern': [
+    'I think I will pass. It is not really the [[COLOR]] I like and the [[PATTERN]] is wrong.',
+    'Neither the [[COLOR]] nor the [[PATTERN]] is what I asked for. Try again, dear.'
+  ],
+  'color+precision': [
+    'Wrong [[COLOR]], and the [[CUTTING]] is crooked besides. Not for me.',
+    'The [[COLOR]] is off and the [[CUTTING]] is rough. I will keep looking.'
+  ],
+  'color+price': [
+    'It is the wrong [[COLOR]] and far too [[EXPENSIVE]] on top of that.',
+    'I might forgive the [[COLOR]], but not at that [[PRICE]]. No.'
+  ],
+  'pattern+precision': [
+    'That [[PATTERN]] is not mine, and the [[CUTTING]] is careless too.',
+    'Wrong [[PATTERN]], sloppy [[CUTTING]]. I am afraid not.'
+  ],
+  'pattern+price': [
+    'The [[PATTERN]] is wrong and the [[PRICE]] is worse. I will pass.',
+    'I did not ask for that [[PATTERN]], and I certainly will not pay something so [[EXPENSIVE]] for it.'
+  ],
+  'precision+price': [
+    'You want that [[PRICE]] for [[CUTTING]] this rough? Absolutely not.',
+    'The [[WORKMANSHIP]] is poor and the [[PRICE]] is outrageous. Good day.'
+  ],
+  'color+pattern+precision': [
+    'The [[COLOR]] is wrong, the [[PATTERN]] is wrong, and the [[CUTTING]] is worse. No.',
+    'Wrong [[COLOR]], wrong [[PATTERN]], and such careless [[CUTTING]]. I am leaving.'
+  ],
+  'color+pattern+price': [
+    'Wrong [[COLOR]], wrong [[PATTERN]], and far too [[EXPENSIVE]]. That is three strikes.',
+    'Neither the [[COLOR]] nor the [[PATTERN]] suits me, and that [[PRICE]] settles it.'
+  ],
+  'color+precision+price': [
+    'The [[COLOR]] is off, the [[CUTTING]] is rough, and the [[PRICE]] is absurd.',
+    'Wrong [[COLOR]], careless [[CUTTING]], and you want how much? Too [[EXPENSIVE]] by half.'
+  ],
+  'pattern+precision+price': [
+    'Wrong [[PATTERN]], sloppy [[CUTTING]], and an [[EXPENSIVE]] one at that. No thank you.',
+    'That [[PATTERN]] is not mine, the [[CUTTING]] is poor, and the [[PRICE]] is insulting.'
+  ],
+  'color+pattern+precision+price': [
+    'Wrong [[COLOR]], wrong [[PATTERN]], shoddy [[CUTTING]], and outrageously [[EXPENSIVE]]. I want nothing to do with it.',
+    'Where do I start? The [[COLOR]], the [[PATTERN]], the [[CUTTING]] &mdash; and then that [[PRICE]]. Absolutely not.'
+  ],
+  'none': [
+    'It is perfectly nice. It just is not speaking to me today.',
+    'Hmm. I cannot say why, exactly. I will leave it, I think.',
+    'Lovely craftsmanship. My taste is simply particular this afternoon.',
+    'Nothing wrong with it at all. It is just not the one for me.'
+  ]
+};
+
+var FLAW_ORDER = ['color','pattern','precision','price'];
+
+/* [[WORD]] becomes a red, bold callout of the thing that went wrong. */
+function flawify(s){
+  return String(s).replace(/\[\[([^\]]+)\]\]/g, '<span class="flaw">$1</span>');
+}
+
+function guestLine(accepted, flaws){
+  if (accepted) return flawify(pick(POSITIVE_LINES));
+  var key=FLAW_ORDER.filter(function(k){ return flaws.indexOf(k)!==-1; }).join('+') || 'none';
+  var pool=NEGATIVE_LINES[key] || NEGATIVE_LINES.none;
+  return flawify(pick(pool));
+}
+
+/* ---- Accessory counter (unlocked and upgraded from the pegboard) ---- */
+function accessoryTier(){ return state.upgrades.accessories|0; }
+function accessoryRange(){
+  var t=accessoryTier();
+  return t>0 ? ACCESSORY_TIERS[t-1] : null;
+}
+/* An accessory sale is judged on its own: the guest may turn the garment down
+   flat and still walk out with a scarf. */
+function rollAccessorySale(){
+  var r=accessoryRange();
+  if (!r) return null;
+  if (Math.random()>=ACCESSORY_CHANCE) return null;
+  var amt=clamp(Math.floor(rnd(r.min, r.max+1)), r.min, r.max);
+  return { amount:amt, tier:r.name };
+}
+
 /* ============================= ORDER FLOW ============================= */
 
 function acceptTicket(tid){
@@ -1901,18 +2243,25 @@ function buildCutGarment(){
              quality:st.finalQuality, precision:st.precision,
              cutShape:st.cutShape, cutClip:st.cutClip, cutAspect:st.cutAspect };
   });
-  var w=0,tot=0,cost=0,prec=0;
+  var w=0,tot=0,cost=0,val=0,prec=0;
   parts.forEach(function(p){
+    var f=fabricById(p.fabricId);
     tot+=p.quality*p.weight; w+=p.weight;
-    cost+=fabricById(p.fabricId).pricePerYard*p.yards;
+    cost+=f.pricePerYard*p.yards;
+    val+=fabricValuePerYard(f)*p.yards;
     prec+=p.precision;
   });
   return { garmentId:g.garment.id, garmentName:g.garment.name, parts:parts,
-           quality:w?tot/w:0, cost:cost, precisionAvg:prec/parts.length };
+           quality:w?tot/w:0, cost:cost, value:val, precisionAvg:prec/parts.length };
 }
 
-/* What the piece is worth before the player marks it up. */
-function baseValue(cg){ return cg.cost + (cg.labor||0); }
+/* What the piece is worth before the player marks it up. Luxury cloth carries a
+   value above what it cost at the counter, so `value` is used when present and
+   the raw outlay is the fallback for anything cut before materials existed. */
+function baseValue(cg){
+  var v = (cg && typeof cg.value==='number') ? cg.value : (cg?cg.cost:0);
+  return v + ((cg&&cg.labor)||0);
+}
 function fairPrice(){ var c=state.cutGarment; return baseValue(c)*(1.2+c.quality/100); }
 
 /* ---- Selling Help colour cues (green = likely, brass = risky, red = won't sell) ---- */
@@ -1970,8 +2319,9 @@ function presentToGuest(){
     if (precFail) accepted=false;
   }
 
-  /* Collect every reason the piece missed, for the walk-away explanation. */
-  var reasons=[];
+  /* Collect every reason the piece missed: `reasons` is the itemised list shown
+     under the result, `flaws` is the key set that picks what the guest says. */
+  var reasons=[], flaws=[];
   if (!accepted){
     var wantAnyColor=g.wantColors.indexOf('any')!==-1;
     var colorMiss=0, patternMiss=0;
@@ -1980,14 +2330,26 @@ function presentToGuest(){
       if (!wantAnyColor && g.wantColors.indexOf(f.colorId)===-1) colorMiss++;
       if (g.wantPattern!=='any' && g.wantPattern!==f.patternId) patternMiss++;
     });
-    if (colorMiss>0)   reasons.push('Color &mdash; the fabric wasn&rsquo;t in the color they asked for.');
-    if (patternMiss>0) reasons.push('Pattern &mdash; the pattern didn&rsquo;t match their request.');
+    if (colorMiss>0){
+      flaws.push('color');
+      reasons.push('Color &mdash; the fabric wasn&rsquo;t in the color they asked for.');
+    }
+    if (patternMiss>0){
+      flaws.push('pattern');
+      reasons.push('Pattern &mdash; the pattern didn&rsquo;t match their request.');
+    }
     if (settings.precisionMatters && precFail){
+      flaws.push('precision');
       reasons.push('Precision &mdash; the cutting was too imprecise ('+Math.round(precAvg)+'%'+
         (precStandard!=null?', short of their '+Math.round(precStandard)+'% standard':'')+').');
     }
-    if (price>g.budget) reasons.push('Price &mdash; '+money(price)+' was over their '+money(g.budget)+' budget.');
-    else if (pf<0.85)   reasons.push('Price &mdash; '+money(price)+' felt steep for the quality.');
+    if (price>g.budget){
+      flaws.push('price');
+      reasons.push('Price &mdash; '+money(price)+' was over their '+money(g.budget)+' budget.');
+    } else if (pf<0.85){
+      flaws.push('price');
+      reasons.push('Price &mdash; '+money(price)+' felt steep for the quality.');
+    }
     if (!reasons.length) reasons.push('Their taste was simply particular today.');
   }
 
@@ -2009,8 +2371,20 @@ function presentToGuest(){
       parts:state.cutGarment.parts.map(function(p){ return { fabricId:p.fabricId, yards:p.yards }; })
     });
   }
+  /* The accessory counter rings up independently of the garment sale. */
+  var acc=rollAccessorySale();
+  if (acc){
+    state.cash+=acc.amount;
+    state.totalSales+=acc.amount;
+    state.dayStats.earned+=acc.amount;
+    state.dayStats.accessories=(state.dayStats.accessories||0)+1;
+    state.dayStats.accessoryEarned=(state.dayStats.accessoryEarned||0)+acc.amount;
+  }
+
   state.lastResult={ accepted:accepted, price:price, quality:q, repDelta:repDelta,
-                     garmentName:state.cutGarment.garmentName, guestName:g.name, reasons:reasons };
+                     garmentName:state.cutGarment.garmentName, guestName:g.name,
+                     reasons:reasons, flaws:flaws, accessory:acc,
+                     say:guestLine(accepted, flaws) };
   state.ui.modal='result';
   renderModal();
 }
@@ -2061,7 +2435,7 @@ function buyFabric(fid, yards){
   if (state.cash<cost){ toast('Not enough cash.'); return; }
   state.cash-=cost;
   state.stock[fid]=(state.stock[fid]||0)+yards;
-  toast('Ordered ' + yards + ' yd of ' + f.colorName + ' ' + f.patternName + '.');
+  toast('Ordered ' + yards + ' yd of ' + esc(fabricFullName(f)) + '.');
   renderAll();
 }
 
@@ -2072,7 +2446,8 @@ function openStore(){
   state.clock=OPEN_MIN;
   state.tickets=[];
   state.closingPending=false;
-  state.dayStats={ sold:0, earned:0, declined:0, expired:0, repStart:state.reputation };
+  state.dayStats={ sold:0, earned:0, declined:0, expired:0, repStart:state.reputation,
+                   accessories:0, accessoryEarned:0 };
   state.nextSpawnAt=OPEN_MIN+SPAWN_FIRST;
   lastTickMs=Date.now();
   startClock();
@@ -2090,7 +2465,8 @@ function stopClock(){
 function clockPaused(){
   /* meta screens pause the day; crafting does not, so the workday stays meaningful */
   var m=state.ui.modal;
-  return m==='menu' || m==='summary' || m==='result';
+  return m==='menu' || m==='summary' || m==='result' ||
+         m==='gameplay' || m==='upgrades' || m==='howto';
 }
 
 function tick(){
@@ -2154,10 +2530,15 @@ function nextDay(){
 
 function saveGame(){
   var data={
-    v:2, day:state.day, cash:state.cash, reputation:state.reputation,
+    v:3, day:state.day, cash:state.cash, reputation:state.reputation,
     guestsServed:state.guestsServed, totalSales:state.totalSales,
     stock:state.stock, rack:state.rack, rackSeq:rackSeq,
-    exclusives:state.exclusives, catalogOff:state.catalogOff, exclusiveSeq:exclusiveSeq
+    exclusives:state.exclusives, catalogOff:state.catalogOff, exclusiveSeq:exclusiveSeq,
+    /* permanent shop upgrades: kept across every save/load, cleared only by New Game */
+    upgrades:{
+      highEndFabrics: !!state.upgrades.highEndFabrics,
+      accessories: accessoryTier()
+    }
   };
   try{
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -2194,6 +2575,14 @@ function loadGame(){
   state.exclusives=Array.isArray(d.exclusives)?d.exclusives:[];
   state.catalogOff=d.catalogOff||{};
   exclusiveSeq=d.exclusiveSeq||(state.exclusives.length+1);
+  /* Upgrades. Saves written before v3 simply have none, and default to locked. */
+  state.upgrades={ highEndFabrics:false, accessories:0 };
+  if (d.upgrades && typeof d.upgrades==='object'){
+    state.upgrades.highEndFabrics = !!d.upgrades.highEndFabrics;
+    var at=parseInt(d.upgrades.accessories,10);
+    state.upgrades.accessories = clamp(isFinite(at)?at:0, 0, ACCESSORY_TIERS.length);
+  }
+  if (!state.upgrades.highEndFabrics) state.ui.shopMat='cotton';
   state.phase='closed';
   state.ui.modal=null;
   toast('Game loaded &mdash; Day ' + state.day + '.');
@@ -2241,6 +2630,8 @@ function renderHUD(){
 
 function renderScene(){
   var rackBadge = state.rack.length ? '<span class="hs-badge">'+state.rack.length+'</span>' : '';
+  var upgCount = affordableUpgrades();
+  var upgBadge = upgCount ? '<span class="hs-badge">'+upgCount+'</span>' : '';
 
   var veil='';
   if (state.phase==='closed'){
@@ -2250,6 +2641,9 @@ function renderScene(){
         '<p>Doors open at 10:00 AM and close at 5:00 PM. Stock up on fabric before you start.</p>'+
         '<button class="btn good" data-act="open-store">Open the Shop</button>'+
         '<button class="btn" data-act="shop">Order Fabric First</button>'+
+        /* the pegboard is behind this card while the shop is shut, so offer it here too */
+        '<button class="btn" data-act="upgrades">Shop Upgrades'+
+          (upgCount?' &middot; '+upgCount+' available':'')+'</button>'+
       '</div>'+
     '</div>';
   }
@@ -2264,6 +2658,10 @@ function renderScene(){
       /* wooden cubby carcass with the folded clothes -> clearance rack */
       '<button class="hotspot" data-act="clearance" style="left:18.5%; top:24.8%; width:57%; height:17.7%;">'+
         '<span class="hs-label">Clearance Rack'+ rackBadge +'</span>'+
+      '</button>'+
+      /* pegboard with the shears and thread spool -> shop upgrades */
+      '<button class="hotspot" data-act="upgrades" style="left:40.5%; top:3.4%; width:25%; height:11.6%;">'+
+        '<span class="hs-label">Upgrades'+ upgBadge +'</span>'+
       '</button>'+
       /* pinned dress design cards on the right wall -> catalog */
       '<button class="hotspot" data-act="catalog" style="left:72%; top:7.5%; width:25%; height:14.5%;">'+
@@ -2365,11 +2763,23 @@ function modalShell(title, sub, bodyHtml, full, cls){
 }
 
 function bodyShop(){
+  /* One material at a time, so the colour list stays the same length whether the
+     shop stocks twenty-four bolts or ninety-six. */
+  var mats=unlockedMaterials();
+  var matId=state.ui.shopMat||'cotton';
+  if (!mats.filter(function(m){ return m.id===matId; }).length) matId='cotton';
+  var matTabs = mats.length>1
+    ? '<div class="mat-tabs">'+mats.map(function(m){
+        return '<button class="mat-tab'+(m.id===matId?' on':'')+'" data-act="mat-tab" data-id="'+m.id+'">'+
+          m.name+'</button>';
+      }).join('')+'</div>'
+    : '';
+
   var openId=state.ui.shopColor;
   var groups=COLORS.map(function(c){
     var isOpen=openId===c.id;
     var owned=0;
-    FABRICS.forEach(function(f){ if (f.colorId===c.id) owned+=ownedYards(f.id); });
+    FABRICS.forEach(function(f){ if (f.colorId===c.id && f.materialId===matId) owned+=ownedYards(f.id); });
     var head='<button class="shop-color'+(isOpen?' open':'')+'" data-act="shop-color" data-id="'+c.id+'" aria-expanded="'+(isOpen?'true':'false')+'">'+
         '<span class="sw" style="background:'+c.hex+'"></span>'+
         '<span class="nm">'+c.name+
@@ -2378,12 +2788,15 @@ function bodyShop(){
       '</button>';
     var drop='';
     if (isOpen){
-      var rows=FABRICS.filter(function(f){ return f.colorId===c.id; }).map(function(f){
+      var rows=FABRICS.filter(function(f){ return f.colorId===c.id && f.materialId===matId; }).map(function(f){
         var afford=state.cash>=f.pricePerYard*2;
+        var worth = f.premium
+          ? ' &middot; worth '+money(fabricValuePerYard(f))+' / yd made up'
+          : '';
         return '<div class="shop-row">'+
           '<div class="sw" style="background:'+swatchBg(f)+'"></div>'+
-          '<div class="nm">'+f.patternName+
-            '<small>'+money(f.pricePerYard)+' / yd &middot; in stock '+ownedYards(f.id).toFixed(1)+' yd</small></div>'+
+          '<div class="nm">'+f.patternName+(f.premium?'<span class="lux">'+f.materialName+'</span>':'')+
+            '<small>'+money(f.pricePerYard)+' / yd'+worth+' &middot; in stock '+ownedYards(f.id).toFixed(1)+' yd</small></div>'+
           '<button class="buy" data-act="buy" data-id="'+f.id+'" '+(afford?'':'disabled')+'>+2 yd<br>'+money(f.pricePerYard*2)+'</button>'+
         '</div>';
       }).join('');
@@ -2391,14 +2804,18 @@ function bodyShop(){
     }
     return '<div class="shop-group'+(isOpen?' open':'')+'">'+head+drop+'</div>';
   }).join('');
-  return '<div class="hint" style="margin-top:0;">Pick a colour to reveal its Solid, Stripes, and Polka Dot bolts. Fabric is bought by the yard.</div>'+groups;
+  var lead = mats.length>1
+    ? 'Pick a material, then a colour to reveal its Solid, Stripes, and Polka Dot bolts. '+
+      'Luxury cloth costs more by the yard but is worth far more once it is made up.'
+    : 'Pick a colour to reveal its Solid, Stripes, and Polka Dot bolts. Fabric is bought by the yard.';
+  return '<div class="hint" style="margin-top:0;">'+lead+'</div>'+matTabs+groups;
 }
 
 function rackChips(r){
   return r.parts.map(function(p){
     var f=fabricById(p.fabricId);
     return '<span class="ri-chip"><span class="dot" style="background:'+swatchBg(f)+'"></span>'+
-      f.colorName+' '+f.patternName+' &middot; '+(Math.round(p.yards*0.5*2)/2).toFixed(1)+'yd back</span>';
+      fabricFullName(f)+' &middot; '+(Math.round(p.yards*0.5*2)/2).toFixed(1)+'yd back</span>';
   }).join('');
 }
 
@@ -2520,6 +2937,7 @@ function bodyTicketDetail(){
           '<div class="dc-block"><div class="lbl">Brief</div><div class="note">No pattern and no garment type &mdash; design whatever you like. Add one or more pieces, cut any shapes, arrange them, and name your price.</div></div>'+
         '</div>'+
       '</div>'+
+      (t.affluent ? '<div class="hint">A discerning client &mdash; luxury cloth will pay for itself here.</div>' : '')+
       (state.guest ? '<div class="hint">You are already working an order.</div>' : '')+
       '<button class="btn good" data-act="accept" data-id="'+t.id+'" '+(state.guest?'disabled':'')+'>Accept Custom Order</button>'+
       '<button class="btn bad" data-act="decline" data-id="'+t.id+'">Turn Away</button>';
@@ -2537,6 +2955,7 @@ function bodyTicketDetail(){
         '<div class="dc-block"><div class="lbl">Pattern Pieces</div><div class="note">'+pieces+'</div></div>'+
       '</div>'+
     '</div>'+
+    (t.affluent ? '<div class="hint">A discerning client &mdash; luxury cloth will pay for itself here.</div>' : '')+
     (state.guest ? '<div class="hint">You are already working an order. Finish it before taking another.</div>' : '')+
     '<button class="btn good" data-act="accept" data-id="'+t.id+'" '+(state.guest?'disabled':'')+'>Accept Order</button>'+
     '<button class="btn bad" data-act="decline" data-id="'+t.id+'">Turn Away</button>';
@@ -2687,13 +3106,13 @@ function bodyTrace(){
   if (st && st.done){
     fabricZone='';
   } else if (open){
-    var grid=FABRICS.map(function(f){
+    var grid=pickerFabrics().map(function(f){
       var avail=ownedYards(f.id)-reservedYards(f.id,pid);
       var can=avail+1e-9>=part.yards;
       var sel=hasFabric && st.fabricId===f.id;
       return '<button class="fab-sw'+(sel?' sel':'')+'" style="background:'+swatchBg(f)+'" '+
         'data-act="pick-fabric" data-part="'+pid+'" data-id="'+f.id+'" '+(can?'':'disabled')+
-        ' title="'+f.colorName+' '+f.patternName+' &middot; '+avail.toFixed(1)+'yd"></button>';
+        ' title="'+fabricFullName(f)+' &middot; '+avail.toFixed(1)+'yd"></button>';
     }).join('');
     fabricZone='<div class="fabric-zone">'+
         '<div class="chip-label">Choose Fabric</div>'+
@@ -2704,7 +3123,7 @@ function bodyTrace(){
     fabricZone='<div class="fabric-zone">'+
         '<button class="fab-toggle" data-act="toggle-fabric">'+
           '<span class="sw" style="background:'+swatchBg(f)+'"></span>'+
-          f.colorName+' '+f.patternName+
+          fabricFullName(f)+
           '<span class="caret">&#9660; change</span>'+
         '</button>'+
       '</div>';
@@ -2765,7 +3184,7 @@ function bodyCustom(){
       return '<div class="ci-row">'+
         '<div class="ci-thumb">'+piecePolySVG(it.fabricId, it.cutShape, 38, 38, 2)+'</div>'+
         '<div class="ci-txt"><b>'+esc(it.name)+'</b>'+
-          '<small>'+f.colorName+' '+f.patternName+' &middot; '+it.yards.toFixed(2)+' yd'+
+          '<small>'+fabricFullName(f)+' &middot; '+it.yards.toFixed(2)+' yd'+
           (it.colorMatch?' &middot; on palette':' &middot; off palette')+'</small></div>'+
         '<button class="ci-x" data-act="remove-item" data-id="'+it.id+'" title="Remove">&times;</button>'+
       '</div>';
@@ -2801,20 +3220,20 @@ function bodyCustomCut(){
 
   var fabricZone;
   if (open){
-    var grid=FABRICS.map(function(f){
+    var grid=pickerFabrics().map(function(f){
       var avail=ownedYards(f.id);
       var can=avail+1e-9>=CLOTH_YARDS;
       var sel=d.fabricId===f.id;
       return '<button class="fab-sw'+(sel?' sel':'')+'" style="background:'+swatchBg(f)+'" '+
         'data-act="pick-custom-fabric" data-id="'+f.id+'" '+(can?'':'disabled')+
-        ' title="'+f.colorName+' '+f.patternName+' &middot; '+avail.toFixed(1)+'yd"></button>';
+        ' title="'+fabricFullName(f)+' &middot; '+avail.toFixed(1)+'yd"></button>';
     }).join('');
     fabricZone='<div class="fabric-zone"><div class="chip-label">Choose Cloth</div>'+
       '<div class="fabric-grid">'+grid+'</div></div>';
   } else {
     var f=fabricById(d.fabricId);
     fabricZone='<div class="fabric-zone"><button class="fab-toggle" data-act="toggle-fabric">'+
-      '<span class="sw" style="background:'+swatchBg(f)+'"></span>'+f.colorName+' '+f.patternName+
+      '<span class="sw" style="background:'+swatchBg(f)+'"></span>'+fabricFullName(f)+
       '<span class="caret">&#9660; change</span></button></div>';
   }
 
@@ -3231,14 +3650,22 @@ function bodyResult(){
         r.reasons.map(function(x){ return '<li style="margin:3px 0;">'+x+'</li>'; }).join('')+
       '</ul>';
   }
+  /* what the guest actually says, with any problem word called out in red */
+  var sayHtml = r.say ? '<div class="say">&ldquo;'+r.say+'&rdquo;</div>' : '';
+  /* the accessory counter is reported separately, since it sells either way */
+  var accHtml = r.accessory
+    ? '<div class="acc-line">Also sold accessories &middot; <b>'+money(r.accessory.amount)+'</b></div>'
+    : '';
   return garmentArt(state.cutGarment)+
     '<div class="res '+(r.accepted?'ok':'no')+'">'+
       '<div class="h">'+(r.accepted?esc(r.guestName)+' loves it!':esc(r.guestName)+' walks away.')+'</div>'+
+      sayHtml+
       '<div class="d">'+(r.accepted
-        ? 'Sold the '+r.garmentName+' for '+money(r.price)+' at '+Math.round(r.quality)+'% match.'
-        : 'The '+r.garmentName+' did not win them over. It is on the clearance rack now.')+'</div>'+
+        ? 'Sold the '+esc(r.garmentName)+' for '+money(r.price)+' at '+Math.round(r.quality)+'% match.'
+        : 'The '+esc(r.garmentName)+' did not win them over. It is on the clearance rack now.')+'</div>'+
       '<div class="d">Reputation '+(r.repDelta>=0?'+':'')+r.repDelta+'</div>'+
       reasonsHtml+
+      accHtml+
     '</div>'+
     '<button class="btn primary" data-act="finish-order">Back to the Shop</button>';
 }
@@ -3254,6 +3681,10 @@ function bodySummary(){
       '<div class="sum-row"><span>Garments sold</span><b>'+d.sold+'</b></div>'+
       '<div class="sum-row"><span>Earned today</span><b>'+money(d.earned)+'</b></div>'+
       '<div class="sum-row"><span>Turned down</span><b>'+d.declined+'</b></div>'+
+      (accessoryTier()
+        ? '<div class="sum-row"><span>Accessory sales</span><b>'+(d.accessories||0)+
+          ' &middot; '+money(d.accessoryEarned||0)+'</b></div>'
+        : '')+
       '<div class="sum-row"><span>Guests who gave up</span><b>'+d.expired+'</b></div>'+
       '<div class="sum-row"><span>Reputation change</span><b>'+(repDelta>=0?'+':'')+repDelta+'</b></div>'+
       '<div class="sum-row"><span>Cash on hand</span><b>'+money(state.cash)+'</b></div>'+
@@ -3302,15 +3733,32 @@ function bodyMenu(){
     '<button class="menu-item" data-act="save">Save Game<small>Stores progress in this browser</small></button>'+
     '<button class="menu-item" data-act="load" '+(hasSave()?'':'disabled')+'>Load Game<small>'+(hasSave()?'Restore your last save':'No save found')+'</small></button>'+
     '<button class="menu-item" data-act="new-game">New Game<small>Start over from Day 1</small></button>'+
-    '<div class="note" style="margin-top:14px;">'+
-      '<b>How to play</b><br>'+
+    '<button class="menu-item" data-act="howto">How To Play<small>The guide to running the atelier</small></button>';
+}
+
+function bodyHowTo(){
+  return '<div class="note" style="margin-top:0;">'+
+      '<b>Running the day</b><br>'+
       'Open the shop, then take order tickets as guests arrive. Tap a ticket to see the colors, pattern, and budget they want. '+
       'Pick fabric for each pattern piece, then cut it out of the square of cloth by dragging around the printed guide lines. '+
       'The closer you follow them the better your precision &mdash; and the outline you actually cut is the shape that goes into the garment. '+
-      'Assemble multi-piece garments, set a price, and present it. '+
-      'Some guests place a <b>custom order</b> instead &mdash; they name only their colors and a budget, and you design the outfit: add as many pieces as you like, cut any shapes, then arrange and layer them however you want.<br><br>'+
-      'Tap the thread spools to order fabric and the lower cubby to work the clearance rack. Guest patience and day length can be changed under Gameplay.'+
-    '</div>';
+      'Assemble multi-piece garments, set a price, and present it.<br><br>'+
+      '<b>Custom orders</b><br>'+
+      'Some guests place a custom order instead &mdash; they name only their colors and a budget, and you design the outfit: '+
+      'add as many pieces as you like, cut any shapes, then arrange and layer them however you want.<br><br>'+
+      '<b>Around the room</b><br>'+
+      'Tap the thread spools to order fabric, the lower cubby to work the clearance rack, the pinned cards on the right wall for '+
+      'your catalog, and the <b>pegboard above the table</b> to buy shop upgrades.<br><br>'+
+      '<b>Upgrades</b><br>'+
+      '<b>High-End Fabrics</b> stocks wool, silk, and cashmere versions of every bolt you carry. They cost more by the yard but are '+
+      'worth far more made up, and they bring wealthier guests into the shop. '+
+      '<b>Accessories</b> adds a counter that has a 30% chance of an extra sale every time you present a piece &mdash; even when the '+
+      'guest turns the garment itself down &mdash; and can be upgraded twice more for larger payouts. '+
+      'Upgrades are permanent and travel with your save.<br><br>'+
+      '<b>Options</b><br>'+
+      'Guest patience, precision scoring, shop traffic, selling help, and day length can all be changed under Gameplay.'+
+    '</div>'+
+    '<button class="btn primary" data-act="menu">Back to Menu</button>';
 }
 
 function renderModal(){
@@ -3335,6 +3783,8 @@ function renderModal(){
   else if (m==='summary') html=modalShell('Day Summary','', bodySummary(), true);
   else if (m==='menu') html=modalShell('Menu','', bodyMenu());
   else if (m==='gameplay') html=modalShell('Gameplay','Options', bodyGameplay());
+  else if (m==='upgrades') html=modalShell('Upgrades','Cash '+money(state.cash), bodyUpgrades());
+  else if (m==='howto') html=modalShell('How To Play','Fashion Frenzy', bodyHowTo());
 
   root.innerHTML=html;
 
@@ -3372,7 +3822,8 @@ document.addEventListener('click', function(e){
   if (veil){
     /* tapping the dimmed area closes only light-weight modals */
     var m=state.ui.modal;
-    if (m==='shop'||m==='clearance'||m==='ticket'||m==='menu'||m==='gameplay'){ state.ui.modal=null; renderAll(); }
+    if (m==='shop'||m==='clearance'||m==='ticket'||m==='menu'||m==='gameplay'||
+        m==='upgrades'||m==='howto'){ state.ui.modal=null; renderAll(); }
     return;
   }
   var el=e.target.closest('[data-act]');
@@ -3411,6 +3862,7 @@ document.addEventListener('click', function(e){
       else if (state.ui.modal==='customcut'){ state.customDraft=null; state.ui.modal=customHome(); }
       else if (state.ui.modal==='customasm'){ state.ui.modal=customHome(); }
       else if (state.ui.modal==='gameplay'){ state.ui.modal='menu'; }
+      else if (state.ui.modal==='howto'){ state.ui.modal='menu'; }
       else if (state.ui.modal==='custom'){
         if (state.guest && state.guest.catalogDesign){ endCatalogDesign(); state.ui.modal='catalog'; state.ui.catalogTab='ex'; }
         else state.ui.modal=null;
@@ -3422,8 +3874,13 @@ document.addEventListener('click', function(e){
       else state.ui.modal=null;
       renderAll(); break;
 
+    case 'howto': state.ui.modal='howto'; renderModal(); break;
+    case 'upgrades': state.ui.modal='upgrades'; renderModal(); break;
+    case 'buy-upgrade': buyUpgrade(id); break;
+
     case 'shop': state.ui.modal='shop'; renderModal(); break;
     case 'shop-color': state.ui.shopColor=(state.ui.shopColor===id?null:id); renderModal(); break;
+    case 'mat-tab': state.ui.shopMat=id; state.ui.shopColor=null; renderModal(); break;
     case 'clearance': state.ui.modal='clearance'; state.ui.donateMode=false; state.ui.donateSel=[]; renderModal(); break;
     case 'buy': buyFabric(id,2); state.ui.modal='shop'; renderModal(); break;
     case 'sell-item': sellRackItem(id); state.ui.modal='clearance'; renderModal(); break;
